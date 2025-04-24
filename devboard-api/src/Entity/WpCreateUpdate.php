@@ -7,6 +7,7 @@ use App\Repository\WpCreateUpdateRepository;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: WpCreateUpdateRepository::class)]
+// This line makes the class an API resource (it will be used as a resource in the API).
 #[ApiResource]
 class WpCreateUpdate
 {
