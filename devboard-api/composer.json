@@ -9,7 +9,7 @@
         "ext-iconv": "*",
         "api-platform/doctrine-orm": "^4.1",
         "api-platform/symfony": "^4.1",
-        "doctrine/dbal": "^3",
+        "doctrine/dbal": "^4.2",
         "doctrine/doctrine-bundle": "^2.14",
         "doctrine/doctrine-migrations-bundle": "^3.4",
         "doctrine/orm": "^3.3",
@@ -22,7 +22,6 @@
         "symfony/expression-language": "7.2.*",
         "symfony/flex": "^2",
         "symfony/framework-bundle": "7.2.*",
-        "symfony/maker-bundle": "^1.62",
         "symfony/property-access": "7.2.*",
         "symfony/property-info": "7.2.*",
         "symfony/runtime": "7.2.*",
@@ -71,6 +70,11 @@
         ],
         "post-update-cmd": [
             "@auto-scripts"
+        ],
+        "cs-clear-cache": [
+            "php bin/console cache:clear",
+            "php bin/console cache:warmup",
+            "composer dump-autoload"
         ]
     },
     "conflict": {
@@ -84,6 +88,7 @@
     },
     "require-dev": {
         "symfony/debug-bundle": "7.2.*",
+        "symfony/maker-bundle": "^1.62",
         "symfony/monolog-bundle": "^3.0",
         "symfony/stopwatch": "7.2.*",
         "symfony/web-profiler-bundle": "7.2.*"

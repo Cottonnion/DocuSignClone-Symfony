@@ -8,7 +8,9 @@ use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 
 #[ORM\Entity(repositoryClass: WpUserRepository::class)]
-#[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_wpsmUser', fields: ['wpsmUser'])]
+#[ORM\Table(name: 'wp_users')]
+#[ORM\UniqueConstraint(name: 'UNIQ_USERNAME', fields: ['username'])]
+#[ORM\UniqueConstraint(name: 'UNIQ_EMAIL', fields: ['email'])]
 class WpUser implements UserInterface, PasswordAuthenticatedUserInterface
 {
     #[ORM\Id]
@@ -16,8 +18,8 @@ class WpUser implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\Column(length: 180)]
-    private ?string $wpsmUser = null;
+    #[ORM\Column(length: 180, unique: true)]
+    private ?string $username = null;
 
     /**
      * @var list<string> The user roles
@@ -31,7 +33,7 @@ class WpUser implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column]
     private ?string $password = null;
 
-    #[ORM\Column(length: 180)]
+    #[ORM\Column(length: 180, unique: true)]
     private ?string $email = null;
 
     #[ORM\Column]
@@ -53,15 +55,14 @@ class WpUser implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->id;
     }
 
-    public function getwpsmUser(): ?string
+    public function getUsername(): ?string
     {
-        return $this->wpsmUser;
+        return $this->username;
     }
 
-    public function setwpsmUser(string $wpsmUser): static
+    public function setUsername(string $username): static
     {
-        $this->wpsmUser = $wpsmUser;
-
+        $this->username = $username;
         return $this;
     }
 
@@ -72,7 +73,7 @@ class WpUser implements UserInterface, PasswordAuthenticatedUserInterface
      */
     public function getUserIdentifier(): string
     {
-        return (string) $this->wpsmUser;
+        return (string) $this->username;
     }
 
     /**
@@ -95,7 +96,6 @@ class WpUser implements UserInterface, PasswordAuthenticatedUserInterface
     public function setRoles(array $roles): static
     {
         $this->roles = $roles;
-
         return $this;
     }
 
@@ -110,7 +110,6 @@ class WpUser implements UserInterface, PasswordAuthenticatedUserInterface
     public function setPassword(string $password): static
     {
         $this->password = $password;
-
         return $this;
     }
 
@@ -120,7 +119,6 @@ class WpUser implements UserInterface, PasswordAuthenticatedUserInterface
     public function eraseCredentials(): void
     {
         // If you store any temporary, sensitive data on the user, clear it here
-        // $this->plainPassword = null;
     }
 
     public function getEmail(): ?string

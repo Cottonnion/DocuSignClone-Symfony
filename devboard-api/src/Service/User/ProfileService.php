@@ -2,6 +2,6 @@
 
 namespace App\Service\User;
 
-class ProfileService
+class profileService
 {
 }   

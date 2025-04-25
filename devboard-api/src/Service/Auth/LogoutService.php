@@ -2,7 +2,7 @@
 
 namespace App\Service\Auth;
 
-class LogoutService
+class logoutService
 {
     
 }

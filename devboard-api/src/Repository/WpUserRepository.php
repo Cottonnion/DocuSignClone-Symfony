@@ -33,6 +33,16 @@ class WpUserRepository extends ServiceEntityRepository implements PasswordUpgrad
         $this->getEntityManager()->flush();
     }
 
+    public function findByEmail(string $email): ?WpUser
+    {
+        return $this->findOneBy(['email' => $email]);
+    }
+
+    public function findByUsername(string $username): ?WpUser
+    {
+        return $this->findOneBy(['username' => $username]);
+    }
+
     //    /**
     //     * @return WpUser[] Returns an array of WpUser objects
     //     */
@@ -48,7 +58,7 @@ class WpUserRepository extends ServiceEntityRepository implements PasswordUpgrad
     //        ;
     //    }
 
-    //    public function findOneBySomeField($value): ?WpUser
+    //    public function findOneByField($value): ?WpUser
     //    {
     //        return $this->createQueryBuilder('w')
     //            ->andWhere('w.exampleField = :val')

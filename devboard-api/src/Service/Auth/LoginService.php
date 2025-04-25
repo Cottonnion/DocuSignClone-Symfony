@@ -2,7 +2,7 @@
 
 namespace App\Service\Auth;
 
-class LoginService
+class loginService
 {
     
 }
