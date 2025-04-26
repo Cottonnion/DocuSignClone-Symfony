@@ -21,6 +21,17 @@ final class userRegisterController extends AbstractController
         private ValidatorInterface $validator  
     ){}
 
+    private function getSecurityHeaders(): array
+        {
+            return [
+                'Strict-Transport-Security' => 'max-age=31536000; includeSubDomains; preload',
+                'X-Content-Type-Options' => 'nosniff',
+                'X-Frame-Options' => 'DENY',
+                'Content-Security-Policy' => "default-src 'self'",
+                'Referrer-Policy' => 'no-referrer',
+            ];
+        }
+
 
     #[Route('/register', name: 'app_user_register', methods: ['POST'])]
     public function registerUser(
@@ -38,12 +49,25 @@ final class userRegisterController extends AbstractController
                 return $this->json([
                     'status' => 'error',
                     'message' => $errorMessages
-                ], Response::HTTP_BAD_REQUEST);
+                ], 
+                Response::HTTP_BAD_REQUEST,
+                $this->getSecurityHeaders());
             }
 
             $result = $this->registrationService->register($registerDTO);
 
-            return $this->json($result, Response::HTTP_CREATED);
+            // Check if the result is an error response
+            if ($result['status'] === 'error') {
+                return $this->json($result, 
+                Response::HTTP_BAD_REQUEST,
+                $this->getSecurityHeaders());
+            }
+
+            // Return success response with 201 Created status
+            return $this->json($result, 
+            Response::HTTP_CREATED,
+            $this->getSecurityHeaders());
+
         } catch (ValidationFailedException $e) {
             $errorMessages = [];
             foreach ($e->getViolations() as $violation) {
@@ -52,7 +76,9 @@ final class userRegisterController extends AbstractController
             return $this->json([
                 'status' => 'error',
                 'message' => $errorMessages
-            ], Response::HTTP_BAD_REQUEST);
+            ], 
+            Response::HTTP_BAD_REQUEST,
+            $this->getSecurityHeaders());
         }
     }
 }
