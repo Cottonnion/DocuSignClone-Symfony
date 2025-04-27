@@ -45,6 +45,12 @@ class WpUser implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column]
     private bool $isActive = true;
 
+    #[ORM\Column(type: 'integer')]
+    private int $failedLoginAttempts = 0;
+
+    #[ORM\Column(type: 'datetime', nullable: true)]
+    private ?\DateTimeImmutable $lockoutUntil = null;
+
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
@@ -157,5 +163,38 @@ class WpUser implements UserInterface, PasswordAuthenticatedUserInterface
     {
         $this->isActive = $isActive;
         return $this;
+    }
+
+    public function getFailedLoginAttempts(): int
+    {
+        return $this->failedLoginAttempts;
+    }
+    
+    public function setFailedLoginAttempts(int $attempts): static
+    {
+        $this->failedLoginAttempts = $attempts;
+        return $this;
+    }
+    
+    public function increaseLoginAttempts(): static
+    {
+        $this->failedLoginAttempts++;
+        return $this;
+    }
+    
+    public function getLockoutUntil(): ?\DateTimeImmutable
+    {
+        return $this->lockoutUntil;
+    }
+    
+    public function setLockoutUntil(?\DateTimeImmutable $until): static
+    {
+        $this->lockoutUntil = $until;
+        return $this;
+    }
+    
+    public function isLockedOut(): bool
+    {
+        return $this->lockoutUntil !== null && $this->lockoutUntil > new \DateTimeImmutable();
     }
 }

@@ -21,7 +21,7 @@ class RegisterDTO
     )]
     public string $password;
 
-    // #[Check\NotBlank('Password is required')]
+    #[Check\NotBlank(message: 'Username is required')]
     #[Check\Length(min:4, minMessage: 'Username must be atleast 4 characters long!')]
     public string $username;
 }
