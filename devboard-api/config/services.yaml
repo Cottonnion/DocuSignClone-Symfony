@@ -20,5 +20,21 @@ services:
             - '../src/Entity/'
             - '../src/Kernel.php'
 
+    # Explicitly define the loginService
+    App\Service\Auth\loginService:
+        arguments:
+            $params: '@parameter_bag'
+        tags: ['app.login_service']
+
+    # controllers are imported separately to make sure services can be injected
+    # as action arguments even if you don't extend any base controller class
+    App\Controller\:
+        resource: '../src/Controller'
+        tags: ['controller.service_arguments']
+
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
+
+    App\EventListener\JWTCreatedSubscriber:
+        tags: 
+            - { name: 'kernel.event_subscriber' }

@@ -33,7 +33,7 @@ final class userRegisterController extends AbstractController
         }
 
 
-    #[Route('/register', name: 'app_user_register', methods: ['POST'])]
+    #[Route('/create', name: 'app_user_register', methods: ['POST'])]
     public function registerUser(
         #[MapRequestPayload] RegisterDTO $registerDTO
     ): Response

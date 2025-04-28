@@ -101,20 +101,20 @@ class loginService
 
             // Update last login time
             $user->setLastLoginAt(new \DateTimeImmutable());
-
+            
             // Reset failed attempts and lockout
             $user->setFailedLoginAttempts(0);
             $user->setLockoutUntil(null);
+
+            // Persist changes immediately after updating lastLoginAt
+            $this->entityManagerInterface->persist($user);
+            $this->entityManagerInterface->flush();
 
             // Generate JWT token
             $token = $this->jwtManager->create($user);
 
             // Log successful login
             $this->userLogger->logLoginAttempt($user->getEmail(), true);
-
-            // Persist changes
-            $this->entityManagerInterface->persist($user);
-            $this->entityManagerInterface->flush();
 
             return [
                 'status' => 'success',

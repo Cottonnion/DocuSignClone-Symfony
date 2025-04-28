@@ -8,21 +8,31 @@ security:
         app_user_provider:
             entity:
                 class: App\Entity\WpUser
-                property: c0tt0nc0ffee
+                property: email
     firewalls:
         dev:
             pattern: ^/(_(profiler|wdt)|css|images|js)/
             security: false
+        login:
+            pattern: ^/api/user/validate_login
+            stateless: true
+            json_login:
+                check_path: /api/user/validate_login
+                success_handler: lexik_jwt_authentication.handler.authentication_success
+                failure_handler: lexik_jwt_authentication.handler.authentication_failure
+                username_path: email
+                password_path: password
+        api:
+            pattern: ^/api
+            stateless: true
+            jwt: ~
         main:
             login_throttling:
-                limit: 5
+                limiter: 5
                 interval: 60
             lazy: true
             provider: app_user_provider
-            custom_authenticator: App\Security\LoginAuthenticatorAuthenticator
-            # Add this to allow public access to certain paths
             pattern: ^/
-            # Add this to allow public access to registration
             security: false
 
     # activate different ways to authenticate
@@ -34,8 +44,13 @@ security:
     # Easy way to control access for large sections of your site
     # Note: Only the *first* access control that matches will be used
     access_control:
-        # Allow public access to registration
-        - { path: ^/api/user/register, roles: PUBLIC_ACCESS }
+        # Allow public access to registration and login
+        - { path: ^/api/user/create, roles: PUBLIC_ACCESS }
+        - { path: ^/api/user/validate_login, roles: PUBLIC_ACCESS }
+        # Protect profile route
+        - { path: ^/api/user/self, roles: IS_AUTHENTICATED_FULLY }
+        # Protect all other API routes
+        - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
         # - { path: ^/admin, roles: ROLE_ADMIN }
         # - { path: ^/profile, roles: ROLE_USER }
 
