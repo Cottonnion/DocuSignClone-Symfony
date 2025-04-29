@@ -51,9 +51,32 @@ class WpUser implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(type: 'datetime', nullable: true)]
     private ?\DateTimeImmutable $lockoutUntil = null;
 
+    #[ORM\OneToOne(mappedBy: 'user', cascade: ['persist', 'remove'])]
+    private ?Profile $profile = null;
+
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
+    }
+
+    public function getProfile(): ?Profile
+    {
+        return $this->profile;
+    }
+
+    public function setProfile(?Profile $profile): static
+    {
+        // unset the owning side of the relation if necessary
+        if ($profile === null) {
+            if ($this->profile !== null) {
+                $this->profile->setUser(null);
+            }
+        } else {
+            $profile->setUser($this);
+        }
+
+        $this->profile = $profile;
+        return $this;
     }
 
     public function getId(): ?int
