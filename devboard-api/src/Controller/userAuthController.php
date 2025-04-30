@@ -4,7 +4,6 @@ namespace App\Controller;
 
 use App\DTO\LoginDTO;
 use App\Service\Auth\loginService;
-use PhpParser\Node\Stmt\TryCatch;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Request;

@@ -3,7 +3,7 @@ lexik_jwt_authentication:
     public_key: '%env(resolve:JWT_PUBLIC_KEY)%'
     encoder:
         signature_algorithm: HS256
-    token_ttl: 3600 # 1 hour
+    token_ttl: 900 # 15 minute
     clock_skew: 0
     allow_no_expiration: false
     pass_phrase: '%env(JWT_PASSPHRASE)%'
