@@ -8,6 +8,7 @@ use App\DTO\LoginDTO;
 use App\Entity\WpUser;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
+use App\Service\Auth\TokenRefreshService;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
@@ -24,7 +25,8 @@ class loginService
         private userLoggerService $userLogger,
         private WpUserRepository $userRepo,
         private JWTTokenManagerInterface $jwtManager,
-        ParameterBagInterface $params
+        private ParameterBagInterface $params,
+        private TokenRefreshService $tokenService
     ) {
         // Set default values in case parameters are missing
         $this->maxAttempts = $params->get('login.max_attempts', 5);
@@ -110,18 +112,19 @@ class loginService
             $this->entityManagerInterface->persist($user);
             $this->entityManagerInterface->flush();
 
-            // Generate JWT token
-            $token = $this->jwtManager->create($user);
+            // Generate both access and refresh tokens
+            $tokens = $this->tokenService->generateTokens($user);
 
             // Log successful login
             $this->userLogger->logLoginAttempt($user->getEmail(), true);
 
             return [
-                'status' => 'success',
-                'token' => $token,
+                'status'        =>  'success',
+                'access_token'  =>  $tokens['access_token'],
+                'refresh_token' =>  $tokens['refresh_token'],
                 'user' => [
-                    'email' => $user->getEmail(),
-                    'username' => $user->getUsername()
+                    'email'     => $user->getEmail(),
+                    'username'  => $user->getUsername()
                 ],
                 'headers' => $this->getSecurityHeaders()
             ];

@@ -38,3 +38,11 @@ services:
     App\EventListener\JWTCreatedSubscriber:
         tags: 
             - { name: 'kernel.event_subscriber' }
+
+    app.authentication_success_handler:
+        class: App\Security\AuthenticationSuccessHandler
+        parent: lexik_jwt_authentication.handler.authentication_success
+        arguments:
+            $jwtManager: '@lexik_jwt_authentication.jwt_manager'
+            $dispatcher: '@event_dispatcher'
+            $tokenRefreshService: '@App\Service\Auth\TokenRefreshService'
