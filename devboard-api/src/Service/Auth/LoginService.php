@@ -2,35 +2,37 @@
 
 namespace App\Service\Auth;
 
-use App\Service\User\userLoggerService;
+use App\Service\User\UserLoggerService;
 use App\Repository\WpUserRepository;
 use App\DTO\LoginDTO;
 use App\Entity\WpUser;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
+use App\Security\IpRateLimiterService;
 use Doctrine\ORM\EntityManagerInterface;
 use App\Service\Auth\TokenRefreshService;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 
-class loginService
+class LoginService
 {
     private int $maxAttempts;
     private int $lockoutMinutes;
     private array $errorMessages;
 
     public function __construct(
-        private EntityManagerInterface $entityManagerInterface,
-        private UserPasswordHasherInterface $userPasswordHasherInterface,
-        private userLoggerService $userLogger,
-        private WpUserRepository $userRepo,
+        private WpUserRepository $userRepository,
+        private UserPasswordHasherInterface $passwordHasher,
         private JWTTokenManagerInterface $jwtManager,
-        private ParameterBagInterface $params,
-        private TokenRefreshService $tokenService
+        private UserLoggerService $userLogger,
+        private IpRateLimiterService $ipRateLimiter,
+        private EntityManagerInterface $entityManager,
+        private TokenRefreshService $tokenRefreshService,
+        private ParameterBagInterface $params
     ) {
         // Set default values in case parameters are missing
-        $this->maxAttempts = $params->get('login.max_attempts', 5);
-        $this->lockoutMinutes = $params->get('login.lockout_minutes', 15);
+        $this->maxAttempts = $this->params->get('app.login.max_attempts');
+        $this->lockoutMinutes = $this->params->get('login.lockout_minutes', 15);
         
         // Set default error messages
         $defaultErrorMessages = [
@@ -41,18 +43,41 @@ class loginService
         ];
         
         // Try to get configured messages, fall back to defaults if not found
-        $this->errorMessages = $params->get('login.error_messages', $defaultErrorMessages);
+        $this->errorMessages = $this->params->get('login.error_messages', $defaultErrorMessages);
     }
 
-    public function loginUser(LoginDTO $loginData): array
+    public function checkIpRateLimit(string $clientIp): array
     {
+        return $this->ipRateLimiter->isIpAllowed($clientIp);
+    }
+
+    public function loginUser(LoginDTO $loginData, string $clientIp): array
+    {
+        // Check IP rate limiting first
+        $ipCheck = $this->ipRateLimiter->isIpAllowed($clientIp);
+        if (!$ipCheck['allowed']) {
+            return [
+                'status' => 'error',
+                'message' => $ipCheck['message'],
+                'retry_after' => $ipCheck['retry_after'],
+                'headers' => array_merge(
+                    $this->getSecurityHeaders(),
+                    ['Retry-After' => $ipCheck['retry_after']]
+                )
+            ];
+        }
+        
         try {
             // Find user by email
-            $user = $this->userRepo->findByEmail($loginData->email);
+            $user = $this->userRepository->findByEmail($loginData->email);
 
             // Check if user exists
             if (!$user) {
                 $this->userLogger->logLoginAttempt($loginData->email, false, 'User not found');
+                
+                // Mark this as a failed attempt for rate limiting
+                $this->ipRateLimiter->isIpAllowed($clientIp);
+                
                 return [
                     'status' => 'error',
                     'message' => $this->errorMessages['invalid_credentials'],
@@ -81,19 +106,34 @@ class loginService
             }
 
             // Verify password
-            if (!$this->userPasswordHasherInterface->isPasswordValid($user, $loginData->password)) {
+            if (!$this->passwordHasher->isPasswordValid($user, $loginData->password)) {
                 $user->increaseLoginAttempts();
-                $this->entityManagerInterface->persist($user);
-                $this->entityManagerInterface->flush();
+                $this->entityManager->persist($user);
+                $this->entityManager->flush();
 
                 if ($user->getFailedLoginAttempts() >= $this->maxAttempts) {
                     $user->setLockoutUntil((new \DateTimeImmutable())->modify("+{$this->lockoutMinutes} minutes"));
                     $user->setFailedLoginAttempts(0); // Reset counter after lockout
-                    $this->entityManagerInterface->persist($user);
-                    $this->entityManagerInterface->flush();
+                    $this->entityManager->persist($user);
+                    $this->entityManager->flush();
                 }
 
                 $this->userLogger->logLoginAttempt($user->getEmail(), false, 'Invalid password');
+                
+                // Mark this as a failed attempt for rate limiting
+                $ipCheck = $this->ipRateLimiter->isIpAllowed($clientIp);
+                if (!$ipCheck['allowed']) {
+                    return [
+                        'status' => 'error',
+                        'message' => $ipCheck['message'],
+                        'retry_after' => $ipCheck['retry_after'],
+                        'headers' => array_merge(
+                            $this->getSecurityHeaders(),
+                            ['Retry-After' => $ipCheck['retry_after']]
+                        )
+                    ];
+                }
+                
                 return [
                     'status' => 'error',
                     'message' => $this->errorMessages['invalid_credentials'],
@@ -109,11 +149,11 @@ class loginService
             $user->setLockoutUntil(null);
 
             // Persist changes immediately after updating lastLoginAt
-            $this->entityManagerInterface->persist($user);
-            $this->entityManagerInterface->flush();
+            $this->entityManager->persist($user);
+            $this->entityManager->flush();
 
             // Generate both access and refresh tokens
-            $tokens = $this->tokenService->generateTokens($user);
+            $tokens = $this->tokenRefreshService->generateTokens($user);
 
             // Log successful login
             $this->userLogger->logLoginAttempt($user->getEmail(), true);
@@ -132,6 +172,9 @@ class loginService
         } catch (\Exception $e) {
             // Log failed login attempt with the actual error message
             $this->userLogger->logLoginAttempt($loginData->email, false, $e->getMessage());
+            
+            // Mark this as a failed attempt for rate limiting
+            $this->ipRateLimiter->isIpAllowed($clientIp);
             
             // Return a generic error message to the client
             return [

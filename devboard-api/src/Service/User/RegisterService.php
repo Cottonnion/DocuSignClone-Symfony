@@ -8,12 +8,12 @@ use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
-class registerService
+class RegisterService
 {
     public function __construct(
         private EntityManagerInterface $entityManagerInterface,
         private UserPasswordHasherInterface $userPasswordHasherInterface,
-        private userLoggerService $userLogger
+        private UserLoggerService $userLogger
     ) {}
 
     public function register(RegisterDTO $userData): array

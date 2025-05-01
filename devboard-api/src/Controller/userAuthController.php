@@ -3,7 +3,7 @@
 namespace App\Controller;
 
 use App\DTO\LoginDTO;
-use App\Service\Auth\loginService;
+use App\Service\Auth\LoginService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Request;
@@ -16,10 +16,10 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use App\Entity\WpUser;
 
 #[Route('/api/user')]
-final class userAuthController extends AbstractController
+final class UserAuthController extends AbstractController
 {
     public function __construct(
-        private loginService $loginService,
+        private LoginService $loginService,
         private ValidatorInterface $validator
     ){}
 
@@ -65,7 +65,12 @@ final class userAuthController extends AbstractController
                 ], Response::HTTP_BAD_REQUEST, $this->getSecurityHeaders());
             }
 
-            $result = $this->loginService->loginUser($loginDTO);
+            // Get client IP with dallbacks
+            $clientIp = $request->headers->get('CF-Connecting-IP') 
+            ?? $request->headers->get('X-Forwarded-For') 
+            ?? $request->getClientIp();
+
+            $result = $this->loginService->loginUser($loginDTO, $clientIp);
             
             // Extract headers from result
             $headers = $result['headers'] ?? $this->getSecurityHeaders();

@@ -4,7 +4,7 @@ namespace App\Service\User;
 
 use Psr\Log\LoggerInterface;
 
-class userLoggerService
+class UserLoggerService
 {
 
     public function __construct(
