@@ -10,6 +10,16 @@ security:
                 class: App\Entity\WpUser
                 property: email
     firewalls:
+        default:
+            login_throttling:
+                max_attempts: 5
+                interval: '15 minutes'
+            json_login:
+                check_path: /api/user/validate_login
+                success_handler: app.authentication_success_handler
+                failure_handler: lexik_jwt_authentication.handler.authentication_failure
+                username_path: email
+                password_path: password
         dev:
             pattern: ^/(_(profiler|wdt)|css|images|js)/
             security: false
@@ -22,14 +32,17 @@ security:
                 failure_handler: lexik_jwt_authentication.handler.authentication_failure
                 username_path: email
                 password_path: password
+            login_throttling:
+                max_attempts: 5
+                interval: '15 minutes'
         api:
             pattern: ^/api
             stateless: true
             jwt: ~
         main:
             login_throttling:
-                limiter: 5
-                interval: 60
+                max_attempts: 5
+                interval: '15 minutes'
             lazy: true
             provider: app_user_provider
             pattern: ^/
