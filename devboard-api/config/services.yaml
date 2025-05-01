@@ -20,8 +20,8 @@ services:
             - '../src/Entity/'
             - '../src/Kernel.php'
 
-    # Explicitly define the loginService
-    App\Service\Auth\loginService:
+    # Explicitly define the LoginService
+    App\Service\Auth\LoginService:
         arguments:
             $params: '@parameter_bag'
         tags: ['app.login_service']
@@ -46,3 +46,11 @@ services:
             $jwtManager: '@lexik_jwt_authentication.jwt_manager'
             $dispatcher: '@event_dispatcher'
             $tokenRefreshService: '@App\Service\Auth\TokenRefreshService'
+
+    App\Security\RateLimitResponseHandler:
+        tags:
+            - { name: 'security.rate_limiter.response_handler', priority: 10 }
+
+    App\Security\LoginThrottlingHandler:
+        tags:
+            - { name: 'security.login_throttling_handler' }

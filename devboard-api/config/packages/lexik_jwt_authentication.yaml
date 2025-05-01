@@ -12,3 +12,7 @@ lexik_jwt_authentication:
             enabled: true
             prefix: Bearer
             name: Authorization
+        cookie:
+            enabled: false
+        query_parameter:
+            enabled: false

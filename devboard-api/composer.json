@@ -13,6 +13,7 @@
         "doctrine/doctrine-bundle": "^2.14",
         "doctrine/doctrine-migrations-bundle": "^3.4",
         "doctrine/orm": "^3.3",
+        "lexik/jwt-authentication-bundle": "3.1",
         "nelmio/cors-bundle": "^2.5",
         "phpdocumentor/reflection-docblock": "^5.6",
         "phpstan/phpdoc-parser": "^2.1",
@@ -22,8 +23,11 @@
         "symfony/expression-language": "7.2.*",
         "symfony/flex": "^2",
         "symfony/framework-bundle": "7.2.*",
+        "symfony/lock": "7.2.*",
+        "symfony/mailer": "7.2.*",
         "symfony/property-access": "7.2.*",
         "symfony/property-info": "7.2.*",
+        "symfony/rate-limiter": "7.2.*",
         "symfony/runtime": "7.2.*",
         "symfony/security-bundle": "7.2.*",
         "symfony/serializer": "7.2.*",
@@ -71,7 +75,7 @@
         "post-update-cmd": [
             "@auto-scripts"
         ],
-        "cs-clear-cache": [
+        "cs-cc": [
             "php bin/console cache:clear",
             "php bin/console cache:warmup",
             "composer dump-autoload"
