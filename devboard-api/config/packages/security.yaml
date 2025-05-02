@@ -11,15 +11,8 @@ security:
                 property: email
     firewalls:
         default:
-            login_throttling:
-                max_attempts: 5
-                interval: '15 minutes'
-            json_login:
-                check_path: /api/user/validate_login
-                success_handler: app.authentication_success_handler
-                failure_handler: lexik_jwt_authentication.handler.authentication_failure
-                username_path: email
-                password_path: password
+            pattern: ^/(_(profiler|wdt)|css|images|js)/
+            security: false
         dev:
             pattern: ^/(_(profiler|wdt)|css|images|js)/
             security: false
@@ -39,12 +32,8 @@ security:
             pattern: ^/api
             stateless: true
             jwt: ~
-        main:
-            login_throttling:
-                max_attempts: 5
-                interval: '15 minutes'
-            lazy: true
             provider: app_user_provider
+        main:
             pattern: ^/
             security: false
 
@@ -60,6 +49,7 @@ security:
         # Allow public access to registration and login
         - { path: ^/api/user/create, roles: PUBLIC_ACCESS }
         - { path: ^/api/user/validate_login, roles: PUBLIC_ACCESS }
+        - { path: ^/api/token/refresh, roles: PUBLIC_ACCESS }
         # Protect profile route
         - { path: ^/api/user/self, roles: IS_AUTHENTICATED_FULLY }
         # Protect all other API routes
