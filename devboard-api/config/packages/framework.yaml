@@ -12,15 +12,15 @@ framework:
             interval: '1 minute'
         login_rate_limiter:
             policy: 'fixed_window'
-            limit: 5
+            limit: 2
             interval: '15 minutes'
-        api_rate_limiter:
-            policy: 'fixed_window'
-            limit: 100
-            interval: '1 minute'
         main_rate_limiter:
             policy: 'fixed_window'
-            limit: 50
+            limit: 2
+            interval: '1 minute'
+        authenticated_api:
+            policy: 'sliding_window'
+            limit: 2
             interval: '1 minute'
 
     #esi: true

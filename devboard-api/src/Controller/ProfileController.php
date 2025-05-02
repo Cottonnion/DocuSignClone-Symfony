@@ -11,6 +11,8 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
+use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
 
 #[Route('/api/user')]
 #[IsGranted('ROLE_USER')]
@@ -18,12 +20,24 @@ class ProfileController extends AbstractController
 {
     public function __construct(
         private profileService $profileService,
-        private ValidatorInterface $validator
+        private ValidatorInterface $validator,
+        private RateLimiterFactory $authenticatedApiLimiter
     ) {}
 
     #[Route('/self', methods: ['GET'])]
     public function getProfile(): JsonResponse
     {
+        $limiter = $this->authenticatedApiLimiter->create($this->getUser()->getUserIdentifier());
+        $limit = $limiter->consume();
+        
+        if (!$limit->isAccepted()) {
+            return $this->json([
+                'status' => 'error',
+                'message' => 'Too many requests',
+                'retry_after' => $limit->getRetryAfter()->getTimestamp()
+            ], Response::HTTP_TOO_MANY_REQUESTS);
+        }
+
         /** @var \App\Entity\WpUser $user */
         $user = $this->getUser();
         $profile = $this->profileService->getProfile($user);
@@ -57,6 +71,17 @@ class ProfileController extends AbstractController
     #[Route('/self', methods: ['PUT'])]
     public function updateProfile(Request $request): JsonResponse
     {
+        $limiter = $this->authenticatedApiLimiter->create($this->getUser()->getUserIdentifier());
+        $limit = $limiter->consume();
+        
+        if (!$limit->isAccepted()) {
+            return $this->json([
+                'status' => 'error',
+                'message' => 'Too many requests',
+                'retry_after' => $limit->getRetryAfter()->getTimestamp()
+            ], Response::HTTP_TOO_MANY_REQUESTS);
+        }
+
         /** @var \App\Entity\WpUser $user */
         $user = $this->getUser();
         
@@ -118,6 +143,17 @@ class ProfileController extends AbstractController
     #[Route('/self/avatar', methods: ['POST'])]
     public function updateAvatar(Request $request): JsonResponse
     {
+        $limiter = $this->authenticatedApiLimiter->create($this->getUser()->getUserIdentifier());
+        $limit = $limiter->consume();
+        
+        if (!$limit->isAccepted()) {
+            return $this->json([
+                'status' => 'error',
+                'message' => 'Too many requests',
+                'retry_after' => $limit->getRetryAfter()->getTimestamp()
+            ], Response::HTTP_TOO_MANY_REQUESTS);
+        }
+
         /** @var \App\Entity\WpUser $user */
         $user = $this->getUser();
 
