@@ -57,7 +57,9 @@ services:
 
     App\EventSubscriber\ApiRateLimitSubscriber:
         arguments:
-            $api: '@limiter.authenticated_api'
+            $authenticatedApiLimiter: '@limiter.authenticated_api'
+            $unauthenticatedApiLimiter: '@limiter.unauthenticated_api'
+            $security: '@security.helper'
         tags:
             - { name: 'kernel.event_subscriber' }
 
