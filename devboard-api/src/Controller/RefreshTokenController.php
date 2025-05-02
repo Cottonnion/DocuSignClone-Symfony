@@ -2,26 +2,52 @@
 
 namespace App\Controller;
 
-use App\DTO\LoginDTO;
 use App\Service\Auth\TokenRefreshService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Validator\Exception\ValidationFailedException;
-use Symfony\Component\Validator\Validator\ValidatorInterface;
-use Symfony\Component\Security\Http\Attribute\CurrentUser;
-use App\Entity\WpUser;
-
+/**
+ * Handles JWT token refresh operations
+ */
 #[Route('/api/token')]
-class RefreshTokenController
+class RefreshTokenController extends AbstractController
 {
-    #[Route('/refresh', name: 'user_refresh_token', methods: ['GET'])]
     public function __construct(
         private TokenRefreshService $tokenRefreshService
-    ){
+    ) {}
 
+    /**
+     * Generates a new access token using a refresh token
+     * 
+     * @param Request $request Must contain X-Refresh-Token header
+     * @return JsonResponse New access token or error message
+     */
+    #[Route('/refresh', name: 'user_refresh_token', methods: ['POST'])]
+    public function refreshToken(Request $request): JsonResponse
+    {
+        $refreshToken = $request->headers->get('X-Refresh-Token');
+        
+        if (!$refreshToken) {
+            return new JsonResponse([
+                'status' => 'error',
+                'message' => 'Refresh token is required'
+            ], 400);
+        }
+
+        $result = $this->tokenRefreshService->refreshAccessToken($refreshToken);
+        
+        if (!$result) {
+            return new JsonResponse([
+                'status' => 'error',
+                'message' => 'Invalid or expired refresh token'
+            ], 401);
+        }
+
+        return new JsonResponse([
+            'status' => 'success',
+            'access_token' => $result['access_token'],
+            'expires_in' => $result['expires_in']
+        ]);
     }
 }

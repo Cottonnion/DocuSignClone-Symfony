@@ -9,16 +9,22 @@ use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 
+/**
+ * Manages JWT token refresh operations
+ */
 class TokenRefreshService
 {
-    
     public function __construct(
         private RefreshTokenRepository $refreshTokenRepository,
         private EntityManagerInterface $entityManager,
         private JWTTokenManagerInterface $jWTTokenManager
     ){}
 
-    public function generateTokens( WpUser $user): array
+    /**
+     * @param WpUser $user User to generate tokens for
+     * @return array{success: bool, access_token: string, refresh_token: string, expires_in: int}
+     */
+    public function generateTokens(WpUser $user): array
     {
         // Delete expired tokens first
         $this->cleanupExpiredTokens();
@@ -48,6 +54,10 @@ class TokenRefreshService
         ];
     }
 
+    /**
+     * @param string $refreshToken Token to validate
+     * @return array{access_token: string, expires_in: int}|null
+     */
     public function refreshAccessToken(string $refreshToken):? array
     {
         $hashedToken = hash('sha256', $refreshToken);
@@ -74,6 +84,9 @@ class TokenRefreshService
         ];
     }
 
+    /**
+     * @param WpUser $user User whose tokens to remove
+     */
     private function removeExistingTokens(WpUser $user): void
     {
         $existingTokens = $this->refreshTokenRepository->findBy([
@@ -87,6 +100,9 @@ class TokenRefreshService
         $this->entityManager->flush();
     }
 
+    /**
+     * Removes expired tokens from database
+     */
     private function cleanupExpiredTokens(): void
     {
         $now = new DateTimeImmutable();

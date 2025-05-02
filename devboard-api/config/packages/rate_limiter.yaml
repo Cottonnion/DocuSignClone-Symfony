@@ -2,5 +2,9 @@ framework:
     rate_limiter:
         authenticated_api:
             policy: 'sliding_window'
+            limit: 100
+            interval: '1 minute'
+        unauthenticated_api:
+            policy: 'sliding_window'
             limit: 20
             interval: '1 minute' 

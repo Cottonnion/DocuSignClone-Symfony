@@ -110,4 +110,9 @@ class RefreshToken
 
         return $this;
     }
+
+    public function isExpired(): bool
+    {
+        return $this->expires_at < new \DateTimeImmutable();
+    }
 }
