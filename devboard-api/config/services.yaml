@@ -54,3 +54,15 @@ services:
     App\Security\LoginThrottlingHandler:
         tags:
             - { name: 'security.login_throttling_handler' }
+
+    App\EventSubscriber\ApiRateLimitSubscriber:
+        arguments:
+            $api: '@limiter.authenticated_api'
+        tags:
+            - { name: 'kernel.event_subscriber' }
+
+    App\EventListener\ExceptionListener:
+        arguments:
+            $debug: true
+        tags:
+            - { name: 'kernel.event_subscriber' }
