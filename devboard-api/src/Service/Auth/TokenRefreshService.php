@@ -20,7 +20,11 @@ class TokenRefreshService
 
     public function generateTokens( WpUser $user): array
     {
-        $this->deactivateExistingTokens($user);
+        // Delete expired tokens first
+        $this->cleanupExpiredTokens();
+        
+        // Deactivate and remove old tokens
+        $this->removeExistingTokens($user);
 
         $accessToken = $this->jWTTokenManager->create($user);
 
@@ -31,8 +35,7 @@ class TokenRefreshService
         $refreshTokenEntity->setRefreshToken(hash('sha256', $refreshToken));
         $refreshTokenEntity->setExpiresAt(new DateTimeImmutable('+14 days'));
         $refreshTokenEntity->setIsActive(true);
-        $refreshTokenEntity->setCreatedAt(new DateTimeImmutable()); // Add this line
-
+        $refreshTokenEntity->setCreatedAt(new DateTimeImmutable());
 
         $this->entityManager->persist($refreshTokenEntity);
         $this->entityManager->flush();
@@ -53,7 +56,12 @@ class TokenRefreshService
             'is_active'     =>  true
         ]);
 
-        if(!$tokenEntity || $tokenEntity->isExpired){
+        if(!$tokenEntity || $tokenEntity->isExpired()){
+            // If token is expired or invalid, remove it
+            if ($tokenEntity) {
+                $this->entityManager->remove($tokenEntity);
+                $this->entityManager->flush();
+            }
             return null;
         }
 
@@ -66,14 +74,26 @@ class TokenRefreshService
         ];
     }
 
-    public function deactivateExistingTokens(WpUser $user){
-        $activeTokens   =   $this->refreshTokenRepository->findBy([
-            'user'      =>  $user,
-            'is_active' =>  true
+    private function removeExistingTokens(WpUser $user): void
+    {
+        $existingTokens = $this->refreshTokenRepository->findBy([
+            'user' => $user
         ]);
 
-        foreach ($activeTokens as $tok){
-            $tok->setIsActive(false);
+        foreach ($existingTokens as $token) {
+            $this->entityManager->remove($token);
+        }
+
+        $this->entityManager->flush();
+    }
+
+    private function cleanupExpiredTokens(): void
+    {
+        $now = new DateTimeImmutable();
+        $expiredTokens = $this->refreshTokenRepository->findExpiredTokens($now);
+
+        foreach ($expiredTokens as $token) {
+            $this->entityManager->remove($token);
         }
 
         $this->entityManager->flush();
