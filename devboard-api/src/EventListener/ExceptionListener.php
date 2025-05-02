@@ -12,6 +12,13 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 class ExceptionListener implements EventSubscriberInterface
 {
+    private bool $debug;
+
+    public function __construct(bool $debug = true) // Set debug to true by default
+    {
+        $this->debug = $debug;
+    }
+
     public static function getSubscribedEvents(): array
     {
         return [
@@ -31,6 +38,7 @@ class ExceptionListener implements EventSubscriberInterface
         
         $statusCode = 500;
         $message = 'Internal Server Error';
+        $details = null;
         
         if ($exception instanceof HttpExceptionInterface) {
             $statusCode = $exception->getStatusCode();
@@ -42,10 +50,20 @@ class ExceptionListener implements EventSubscriberInterface
             $statusCode = 400;
             $message = $this->formatValidationErrors($exception->getViolations());
         }
+
+        // Always include detailed error information in development
+        $details = [
+            'message' => $exception->getMessage(),
+            'class' => get_class($exception),
+            'file' => $exception->getFile(),
+            'line' => $exception->getLine(),
+            'trace' => array_slice(explode("\n", $exception->getTraceAsString()), 0, 10) // First 10 lines of stack trace
+        ];
         
         $response = new JsonResponse([
             'status' => 'error',
             'message' => $message,
+            'details' => $details
         ], $statusCode);
         
         $event->setResponse($response);
