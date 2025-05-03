@@ -13,12 +13,18 @@ use App\Service\Auth\TokenRefreshService;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
+use Symfony\Contracts\Cache\CacheInterface;
+use Symfony\Contracts\Cache\ItemInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 class LoginService
 {
     private int $maxAttempts;
     private int $lockoutMinutes;
     private array $errorMessages;
+    private const MAX_LOGIN_ATTEMPTS = 5;
+    private const LOGIN_ATTEMPT_WINDOW = 900; // 15 minutes
+    private const CACHE_PREFIX = 'login_attempts_';
 
     public function __construct(
         private WpUserRepository $userRepository,
@@ -28,11 +34,12 @@ class LoginService
         private IpRateLimiterService $ipRateLimiter,
         private EntityManagerInterface $entityManager,
         private TokenRefreshService $tokenRefreshService,
-        private ParameterBagInterface $params
+        private ParameterBagInterface $params,
+        private CacheInterface $cache
     ) {
         // Set default values in case parameters are missing
         $this->maxAttempts = $this->params->get('app.login.max_attempts');
-        $this->lockoutMinutes = $this->params->get('login.lockout_minutes', 15);
+        $this->lockoutMinutes = $this->params->get('app.login.lockout_minutes', 15);
         
         // Set default error messages
         $defaultErrorMessages = [
@@ -43,7 +50,7 @@ class LoginService
         ];
         
         // Try to get configured messages, fall back to defaults if not found
-        $this->errorMessages = $this->params->get('login.error_messages', $defaultErrorMessages);
+        $this->errorMessages = $this->params->get('app.login.error_messages', $defaultErrorMessages);
     }
 
     public function checkIpRateLimit(string $clientIp): array
@@ -95,29 +102,8 @@ class LoginService
                 ];
             }
 
-            // Verify if account is locked
-            if ($user->isLockedOut()) {
-                $this->userLogger->logLoginAttempt($user->getEmail(), false, 'Account locked');
-                return [
-                    'status' => 'error',
-                    'message' => $this->errorMessages['account_locked'],
-                    'headers' => $this->getSecurityHeaders()
-                ];
-            }
-
             // Verify password
             if (!$this->passwordHasher->isPasswordValid($user, $loginData->password)) {
-                $user->increaseLoginAttempts();
-                $this->entityManager->persist($user);
-                $this->entityManager->flush();
-
-                if ($user->getFailedLoginAttempts() >= $this->maxAttempts) {
-                    $user->setLockoutUntil((new \DateTimeImmutable())->modify("+{$this->lockoutMinutes} minutes"));
-                    $user->setFailedLoginAttempts(0); // Reset counter after lockout
-                    $this->entityManager->persist($user);
-                    $this->entityManager->flush();
-                }
-
                 $this->userLogger->logLoginAttempt($user->getEmail(), false, 'Invalid password');
                 
                 // Mark this as a failed attempt for rate limiting
@@ -142,13 +128,7 @@ class LoginService
             }
 
             // Update last login time
-            $user->setLastLoginAt(new \DateTimeImmutable());
-            
-            // Reset failed attempts and lockout
-            $user->setFailedLoginAttempts(0);
-            $user->setLockoutUntil(null);
-
-            // Persist changes immediately after updating lastLoginAt
+            $user->setLastLoginAt(new \DateTime());
             $this->entityManager->persist($user);
             $this->entityManager->flush();
 
@@ -176,10 +156,15 @@ class LoginService
             // Mark this as a failed attempt for rate limiting
             $this->ipRateLimiter->isIpAllowed($clientIp);
             
-            // Return a generic error message to the client
+            // Return a more detailed error message to the client
             return [
                 'status' => 'error',
-                'message' => $this->errorMessages['generic_error'],
+                'message' => $this->errorMessages['generic_error'] . 'custom',
+                'details' => [
+                    'error' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine()
+                ],
                 'headers' => $this->getSecurityHeaders()
             ];
         }
@@ -194,5 +179,67 @@ class LoginService
             'Content-Security-Policy' => "default-src 'self'",
             'Referrer-Policy' => 'no-referrer',
         ];
+    }
+
+    public function validateCredentials(string $email, string $password): ?WpUser
+    {
+        $user = $this->userRepository->findOneBy(['email' => $email]);
+        if (!$user) {
+            return null;
+        }
+
+        if (!$this->passwordHasher->isPasswordValid($user, $password)) {
+            return null;
+        }
+
+        return $user;
+    }
+
+    public function validateLogin(string $email): array
+    {
+        $user = $this->userRepository->findOneBy(['email' => $email]);
+        if (!$user) {
+            return [
+                'status' => 'error',
+                'message' => 'User not found'
+            ];
+        }
+
+        // Generate JWT token
+        $token = $this->jwtManager->create($user);
+
+        // Update last login time
+        $user->setLastLoginAt(new \DateTime());
+        $this->entityManager->flush();
+
+        return [
+            'status' => 'success',
+            'token' => $token,
+            'user' => [
+                'id' => $user->getId(),
+                'email' => $user->getEmail(),
+                'roles' => $user->getRoles()
+            ]
+        ];
+    }
+
+    private function isRateLimited(string $ip): bool
+    {
+        $cacheKey = self::CACHE_PREFIX . $ip;
+        $attempts = $this->cache->get($cacheKey, function (ItemInterface $item) {
+            $item->expiresAfter(self::LOGIN_ATTEMPT_WINDOW);
+            return 0;
+        });
+
+        if ($attempts >= self::MAX_LOGIN_ATTEMPTS) {
+            return true;
+        }
+
+        $this->cache->get($cacheKey, function (ItemInterface $item) use ($attempts) {
+            $item->expiresAfter(self::LOGIN_ATTEMPT_WINDOW);
+            return $attempts + 1;
+        });
+
+        return false;
     }
 }

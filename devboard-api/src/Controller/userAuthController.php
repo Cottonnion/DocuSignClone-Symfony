@@ -3,7 +3,9 @@
 namespace App\Controller;
 
 use App\DTO\LoginDTO;
+use App\DTO\MFAVerificationDTO;
 use App\Service\Auth\LoginService;
+use App\Service\Auth\MFAService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Request;
@@ -14,12 +16,15 @@ use Symfony\Component\Validator\Exception\ValidationFailedException;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use App\Entity\WpUser;
+use Symfony\Component\Serializer\SerializerInterface;
 
 #[Route('/api/user')]
 final class UserAuthController extends AbstractController
 {
     public function __construct(
         private LoginService $loginService,
+        private MFAService $mfaService,
+        private SerializerInterface $serializer,
         private ValidatorInterface $validator
     ){}
 
@@ -47,65 +52,105 @@ final class UserAuthController extends AbstractController
                 ], Response::HTTP_BAD_REQUEST, $this->getSecurityHeaders());
             }
 
-            $loginDTO = new LoginDTO();
-            $loginDTO->email = $data['email'] ?? '';
-            $loginDTO->password = $data['password'] ?? '';
+            // Check if this is a MFA verification request
+            if (isset($data['code'])) {
+                try {
+                    $mfaDTO = $this->serializer->deserialize($request->getContent(), MFAVerificationDTO::class, 'json');
+                    $errors = $this->validator->validate($mfaDTO);
+                    
+                    if (count($errors) > 0) {
+                        $errorMessages = [];
+                        foreach ($errors as $error) {
+                            $errorMessages[] = $error->getMessage();
+                        }
+                        return $this->json([
+                            'status' => 'error',
+                            'message' => $errorMessages
+                        ], Response::HTTP_BAD_REQUEST, $this->getSecurityHeaders());
+                    }
 
-            $errors = $this->validator->validate($loginDTO);
+                    // Verify MFA code
+                    if (!$this->mfaService->verifyMFACode($mfaDTO->email, $mfaDTO->code)) {
+                        return $this->json([
+                            'status' => 'error',
+                            'message' => 'Invalid or expired verification code'
+                        ], Response::HTTP_UNAUTHORIZED, $this->getSecurityHeaders());
+                    }
 
-            if (count($errors) > 0) {
-                $errorMessages = [];
-                foreach ($errors as $err) {
-                    $errorMessages[] = $err->getMessage();
+                    // If MFA verification successful, proceed with login
+                    $result = $this->loginService->validateLogin($mfaDTO->email);
+                    return $this->json($result, Response::HTTP_OK, $this->getSecurityHeaders());
+                } catch (\Exception $e) {
+                    return $this->json([
+                        'status' => 'error',
+                        'message' => 'Failed to verify MFA code',
+                        'details' => $this->getDebugDetails($e)
+                    ], Response::HTTP_INTERNAL_SERVER_ERROR, $this->getSecurityHeaders());
                 }
-            
+            }
+
+            // Initial login request with email/password
+            try {
+                $loginDTO = $this->serializer->deserialize($request->getContent(), LoginDTO::class, 'json');
+                $errors = $this->validator->validate($loginDTO);
+                
+                if (count($errors) > 0) {
+                    $errorMessages = [];
+                    foreach ($errors as $error) {
+                        $errorMessages[] = $error->getMessage();
+                    }
+                    return $this->json([
+                        'status' => 'error',
+                        'message' => $errorMessages
+                    ], Response::HTTP_BAD_REQUEST, $this->getSecurityHeaders());
+                }
+
+                // Validate credentials and get user
+                $user = $this->loginService->validateCredentials($loginDTO->email, $loginDTO->password);
+                if (!$user) {
+                    return $this->json([
+                        'status' => 'error',
+                        'message' => 'Invalid credentials'
+                    ], Response::HTTP_UNAUTHORIZED, $this->getSecurityHeaders());
+                }
+
+                // Send MFA code
+                $this->mfaService->generateAndSendMFACode($user);
+                
+                return $this->json([
+                    'status' => 'success',
+                    'message' => 'Verification code sent to your email',
+                    'email' => $loginDTO->email
+                ], Response::HTTP_OK, $this->getSecurityHeaders());
+            } catch (\Exception $e) {
                 return $this->json([
                     'status' => 'error',
-                    'message' => $errorMessages
-                ], Response::HTTP_BAD_REQUEST, $this->getSecurityHeaders());
+                    'message' => 'Failed to process login request',
+                    'details' => $this->getDebugDetails($e)
+                ], Response::HTTP_INTERNAL_SERVER_ERROR, $this->getSecurityHeaders());
             }
 
-            // Get client IP with dallbacks
-            $clientIp = $request->headers->get('CF-Connecting-IP') 
-            ?? $request->headers->get('X-Forwarded-For') 
-            ?? $request->getClientIp();
-
-            $result = $this->loginService->loginUser($loginDTO, $clientIp);
-            
-            // Extract headers from result
-            $headers = $result['headers'] ?? $this->getSecurityHeaders();
-            unset($result['headers']); // Remove headers from response body
-
-            // Check if the result is an error response
-            if ($result['status'] === 'error') {
-                return $this->json(
-                    $result,
-                    Response::HTTP_UNAUTHORIZED,
-                    $headers
-                );
-            }
-
-            // Return success response with 200
-            return $this->json(
-                $result,
-                Response::HTTP_OK,
-                $headers
-            );
-
-        } catch (ValidationFailedException $e) {
-            $errorMessages = [];
-            foreach ($e->getViolations() as $violation) {
-                $errorMessages[] = $violation->getMessage();
-            }
-            return $this->json([
-                'status' => 'error',
-                'message' => $errorMessages
-            ], Response::HTTP_BAD_REQUEST, $this->getSecurityHeaders());
         } catch (\Exception $e) {
             return $this->json([
                 'status' => 'error',
-                'message' => 'An error occurred during login'
+                'message' => 'An unexpected error occurred',
+                'details' => $this->getDebugDetails($e)
             ], Response::HTTP_INTERNAL_SERVER_ERROR, $this->getSecurityHeaders());
         }
+    }
+
+    private function getDebugDetails(\Exception $e): ?array
+    {
+        if (!$this->getParameter('kernel.debug')) {
+            return null;
+        }
+
+        return [
+            'message' => $e->getMessage(),
+            'class' => get_class($e),
+            'file' => $e->getFile(),
+            'line' => $e->getLine(),
+            'trace' => array_slice(explode("\n", $e->getTraceAsString()), 0, 5)
+        ];
     }
 }

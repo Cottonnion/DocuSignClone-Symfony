@@ -39,20 +39,17 @@ class WpUser implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
 
-    #[ORM\Column(nullable: true)]
-    private ?\DateTimeImmutable $lastLoginAt = null;
+    #[ORM\Column(type: 'datetime', nullable: true)]
+    private ?\DateTimeInterface $lastLoginAt = null;
 
     #[ORM\Column]
     private bool $isActive = true;
 
-    #[ORM\Column(type: 'integer')]
-    private int $failedLoginAttempts = 0;
-
-    #[ORM\Column(type: 'datetime', nullable: true)]
-    private ?\DateTimeImmutable $lockoutUntil = null;
-
     #[ORM\OneToOne(mappedBy: 'user', cascade: ['persist', 'remove'])]
     private ?Profile $profile = null;
+
+    #[ORM\Column(type: 'datetime', nullable: true)]
+    private ?\DateTimeInterface $lastPasswordChange = null;
 
     public function __construct()
     {
@@ -166,12 +163,12 @@ class WpUser implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->createdAt;
     }
 
-    public function getLastLoginAt(): ?\DateTimeImmutable
+    public function getLastLoginAt(): ?\DateTimeInterface
     {
         return $this->lastLoginAt;
     }
 
-    public function setLastLoginAt(?\DateTimeImmutable $lastLoginAt): static
+    public function setLastLoginAt(?\DateTimeInterface $lastLoginAt): static
     {
         $this->lastLoginAt = $lastLoginAt;
         return $this;
@@ -188,36 +185,14 @@ class WpUser implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    public function getFailedLoginAttempts(): int
+    public function getLastPasswordChange(): ?\DateTimeInterface
     {
-        return $this->failedLoginAttempts;
+        return $this->lastPasswordChange;
     }
-    
-    public function setFailedLoginAttempts(int $attempts): static
+
+    public function setLastPasswordChange(?\DateTimeInterface $lastPasswordChange): self
     {
-        $this->failedLoginAttempts = $attempts;
+        $this->lastPasswordChange = $lastPasswordChange;
         return $this;
-    }
-    
-    public function increaseLoginAttempts(): static
-    {
-        $this->failedLoginAttempts++;
-        return $this;
-    }
-    
-    public function getLockoutUntil(): ?\DateTimeImmutable
-    {
-        return $this->lockoutUntil;
-    }
-    
-    public function setLockoutUntil(?\DateTimeImmutable $until): static
-    {
-        $this->lockoutUntil = $until;
-        return $this;
-    }
-    
-    public function isLockedOut(): bool
-    {
-        return $this->lockoutUntil !== null && $this->lockoutUntil > new \DateTimeImmutable();
     }
 }
