@@ -14,6 +14,7 @@ use Twig\Environment;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Monolog\Attribute\AsChannel;
+use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 
 #[AsChannel('user')]
 class PasswordResetService
@@ -33,7 +34,8 @@ class PasswordResetService
         private MailerInterface $mailer,
         private UrlGeneratorInterface $urlGenerator,
         private Environment $twig,
-        private LoggerInterface $logger
+        private LoggerInterface $logger,
+        private ParameterBagInterface $params
     ) {
         $this->emailTokenCache = new FilesystemAdapter('password_reset', 0, sys_get_temp_dir());
         $this->rateLimitCache = new FilesystemAdapter('rate_limit', 0, sys_get_temp_dir());
@@ -189,11 +191,16 @@ class PasswordResetService
         $body = $this->twig->render('emails/password_changed.html.twig');
         
         $email = (new Email())
-            ->from('noreply@devboard.com')
+            ->from($this->params->get('app.mailer_from'))
             ->to($user->getEmail())
             ->subject('Your DevBoard Password Has Been Changed')
             ->html($body);
             
         $this->mailer->send($email);
+        
+        $this->logger->info('Password change notification sent', [
+            'user_id' => $user->getId(),
+            'email' => $user->getEmail()
+        ]);
     }
 }
