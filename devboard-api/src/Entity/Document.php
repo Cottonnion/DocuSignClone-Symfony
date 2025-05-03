@@ -7,6 +7,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Annotation\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: DocumentRepository::class)]
@@ -15,39 +16,49 @@ class Document
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['document:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank]
+    #[Groups(['document:read'])]
     private ?string $title = null;
 
     #[ORM\Column(length: 255)]
+    #[Groups(['document:read'])]
     private ?string $filePath = null;
 
     #[ORM\Column(length: 20)]
     #[Assert\Choice(choices: ['draft', 'sent', 'signed', 'cancelled'])]
+    #[Groups(['document:read'])]
     private ?string $status = 'draft';
 
     #[ORM\ManyToOne]
     #[ORM\JoinColumn(nullable: false)]
+    #[Groups(['document:read'])]
     private ?WpUser $createdBy = null;
 
     #[ORM\Column]
+    #[Groups(['document:read'])]
     private ?\DateTimeImmutable $createdAt = null;
 
     #[ORM\Column]
+    #[Groups(['document:read'])]
     private ?\DateTimeImmutable $updatedAt = null;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true)]
+    #[Groups(['document:read'])]
     private ?\DateTimeInterface $signDeadline = null;
 
     #[ORM\Column]
+    #[Groups(['document:read'])]
     private bool $isTemplate = false;
 
     #[ORM\OneToOne(mappedBy: 'document', cascade: ['persist', 'remove'])]
     private ?Template $template = null;
 
     #[ORM\OneToMany(mappedBy: 'document', targetEntity: Signatory::class, orphanRemoval: true)]
+    #[Groups(['document:read'])]
     private Collection $signatories;
 
     public function __construct()

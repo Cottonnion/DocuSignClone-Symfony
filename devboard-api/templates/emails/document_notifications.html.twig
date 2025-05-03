@@ -1,0 +1,57 @@
+{% block document_sent %}
+    <h1>Document Signing Request</h1>
+    <p>Hello {{ signatory.name }},</p>
+    <p>You have been requested to sign the document: <strong>{{ document.title }}</strong></p>
+    <p>Please click the link below to review and sign the document:</p>
+    <p><a href="{{ signing_url }}">Sign Document</a></p>
+    <p>This document requires your signature by: {{ document.expiryDate|date('Y-m-d H:i:s') }}</p>
+    <p>If you have any questions, please contact the document creator.</p>
+{% endblock %}
+
+{% block document_reminder %}
+    <h1>Document Signing Reminder</h1>
+    <p>Hello {{ signatory.name }},</p>
+    <p>This is a reminder that you still need to sign the document: <strong>{{ document.title }}</strong></p>
+    <p>The document is due by: {{ document.expiryDate|date('Y-m-d H:i:s') }}</p>
+    <p>Please click the link below to review and sign the document:</p>
+    <p><a href="{{ signing_url }}">Sign Document</a></p>
+    <p>If you have already signed this document, please ignore this email.</p>
+{% endblock %}
+
+{% block document_completed %}
+    <h1>Document Fully Signed</h1>
+    <p>Hello {{ user.name }},</p>
+    <p>The document <strong>{{ document.title }}</strong> has been fully signed by all parties.</p>
+    <p>You can download the signed document by clicking the link below:</p>
+    <p><a href="{{ download_url }}">Download Signed Document</a></p>
+{% endblock %}
+
+{% block document_rejected %}
+    <h1>Document Rejected</h1>
+    <p>Hello {{ user.name }},</p>
+    <p>The document <strong>{{ document.title }}</strong> has been rejected by {{ rejector.name }}.</p>
+    <p>Reason: {{ rejection_reason }}</p>
+    <p>You can review the document by clicking the link below:</p>
+    <p><a href="{{ document_url }}">View Document</a></p>
+{% endblock %}
+
+{% block signatory_signed %}
+    <h1>Document Signed</h1>
+    <p>Hello {{ user.name }},</p>
+    <p>{{ signatory.name }} has signed the document <strong>{{ document.title }}</strong>.</p>
+    <p>{% if remaining_signatories > 0 %}
+        There are still {{ remaining_signatories }} signatories pending.
+    {% else %}
+        All parties have signed the document.
+    {% endif %}</p>
+    <p>You can view the document status by clicking the link below:</p>
+    <p><a href="{{ document_url }}">View Document Status</a></p>
+{% endblock %}
+
+{% block document_expiry_warning %}
+    <h1>Document Expiry Warning</h1>
+    <p>Hello {{ user.name }},</p>
+    <p>The document <strong>{{ document.title }}</strong> will expire in {{ days_remaining }} days.</p>
+    <p>Please ensure all parties sign the document before the expiry date: {{ document.expiryDate|date('Y-m-d H:i:s') }}</p>
+    <p><a href="{{ document_url }}">View Document</a></p>
+{% endblock %} 

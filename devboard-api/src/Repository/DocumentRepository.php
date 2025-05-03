@@ -40,4 +40,26 @@ class DocumentRepository extends ServiceEntityRepository
     //            ->getOneOrNullResult()
     //        ;
     //    }
+
+    public function findByFilters(?string $status = null, ?bool $isTemplate = null, ?string $createdBy = null): array
+    {
+        $qb = $this->createQueryBuilder('d');
+
+        if ($status !== null) {
+            $qb->andWhere('d.status = :status')
+               ->setParameter('status', $status);
+        }
+
+        if ($isTemplate !== null) {
+            $qb->andWhere('d.isTemplate = :isTemplate')
+               ->setParameter('isTemplate', $isTemplate);
+        }
+
+        if ($createdBy !== null) {
+            $qb->andWhere('d.createdBy = :createdBy')
+               ->setParameter('createdBy', $createdBy);
+        }
+
+        return $qb->getQuery()->getResult();
+    }
 }

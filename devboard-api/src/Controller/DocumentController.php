@@ -4,18 +4,26 @@ namespace App\Controller;
 
 use App\Entity\Document;
 use App\Service\DocumentService;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Serializer\SerializerInterface;
+use Symfony\Component\String\Slugger\SluggerInterface;
 
 #[Route('api/v1/documents')]
 class DocumentController extends AbstractController
 {
     public function __construct(
-        private DocumentService $documentService
+        private DocumentService $documentService,
+        private EntityManagerInterface $entityManager,
+        private string $uploadDirectory,
+        private SluggerInterface $slugger,
+        private SerializerInterface $serializer
     ) {
     }
 
@@ -28,7 +36,8 @@ class DocumentController extends AbstractController
 
         $documents = $this->documentService->getDocuments($status, $isTemplate, $createdBy);
         
-        return $this->json($documents);
+        $json = $this->serializer->serialize($documents, 'json', ['groups' => 'document:read']);
+        return new JsonResponse($json, Response::HTTP_OK, [], true);
     }
 
     #[Route('', name: 'documents_create', methods: ['POST'])]
@@ -39,7 +48,8 @@ class DocumentController extends AbstractController
                 $request->getContent(),
                 $this->getUser()
             );
-            return $this->json($document, Response::HTTP_CREATED);
+            $json = $this->serializer->serialize($document, 'json', ['groups' => 'document:read']);
+            return new JsonResponse($json, Response::HTTP_CREATED, [], true);
         } catch (\InvalidArgumentException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
@@ -48,7 +58,8 @@ class DocumentController extends AbstractController
     #[Route('/{id}', name: 'documents_get', methods: ['GET'])]
     public function get(Document $document): JsonResponse
     {
-        return $this->json($document);
+        $json = $this->serializer->serialize($document, 'json', ['groups' => 'document:read']);
+        return new JsonResponse($json, Response::HTTP_OK, [], true);
     }
 
     #[Route('/{id}', name: 'documents_update', methods: ['PUT'])]
@@ -59,7 +70,8 @@ class DocumentController extends AbstractController
                 $document,
                 $request->getContent()
             );
-            return $this->json($document);
+            $json = $this->serializer->serialize($document, 'json', ['groups' => 'document:read']);
+            return new JsonResponse($json, Response::HTTP_OK, [], true);
         } catch (\InvalidArgumentException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
@@ -105,14 +117,93 @@ class DocumentController extends AbstractController
         }
     }
 
+    #[Route('/upload', name: 'documents_upload', methods: ['POST'])]
+    public function upload(Request $request): JsonResponse
+    {
+        /** @var UploadedFile $file */
+        $file = $request->files->get('file');
+        
+        if (!$file) {
+            return $this->json(['error' => 'No file uploaded'], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Validate file type
+        $allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+        if (!in_array($file->getMimeType(), $allowedMimeTypes)) {
+            return $this->json(['error' => 'Invalid file type. Allowed types: PDF, JPEG, PNG'], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Generate unique filename
+        $originalFilename = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+        $safeFilename = $this->slugger->slug($originalFilename);
+        $newFilename = $safeFilename.'-'.uniqid().'.'.$file->guessExtension();
+
+        try {
+            // Ensure upload directory exists
+            if (!is_dir($this->uploadDirectory)) {
+                mkdir($this->uploadDirectory, 0777, true);
+            }
+
+            // Move file to upload directory
+            $file->move($this->uploadDirectory, $newFilename);
+
+            // Create document entity
+            $document = new Document();
+            $document->setTitle($originalFilename);
+            $document->setFilePath($newFilename); // Store only the filename
+            $document->setCreatedBy($this->getUser());
+
+            $this->entityManager->persist($document);
+            $this->entityManager->flush();
+
+            // Serialize with groups
+            $json = $this->serializer->serialize($document, 'json', ['groups' => 'document:read']);
+            return new JsonResponse($json, Response::HTTP_CREATED, [], true);
+        } catch (\Exception $e) {
+            return $this->json(
+                [
+                    'error' => 'Failed to upload file',
+                    'details' => [
+                        'msg' => $e->getMessage(),
+                        'upload_dir' => $this->uploadDirectory,
+                        'filename' => $newFilename
+                    ]
+                ],
+                Response::HTTP_INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
     #[Route('/{id}/download', name: 'documents_download', methods: ['GET'])]
     public function download(Document $document): Response
     {
         try {
-            $filePath = $this->documentService->getDocumentFile($document);
-            return $this->file($filePath);
-        } catch (\InvalidArgumentException $e) {
-            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+            $filePath = $document->getFilePath();
+            // Extract just the filename from the path
+            $filename = basename($filePath);
+            $fullPath = $this->uploadDirectory.'/'.$filename;
+            
+            if (!file_exists($fullPath)) {
+                return $this->json([
+                    'error' => 'File not found',
+                    'details' => [
+                        'original_path' => $filePath,
+                        'filename' => $filename,
+                        'full_path' => $fullPath,
+                        'upload_dir' => $this->uploadDirectory
+                    ]
+                ], Response::HTTP_NOT_FOUND);
+            }
+
+            return $this->file($fullPath);
+        } catch (\Exception $e) {
+            return $this->json([
+                'error' => $e->getMessage(),
+                'details' => [
+                    'filepath' => $document->getFilePath(),
+                    'upload_dir' => $this->uploadDirectory
+                ]
+            ], Response::HTTP_BAD_REQUEST);
         }
     }
 } 

@@ -225,10 +225,10 @@ class DocumentService
 
     public function getDocumentFile(Document $document): string
     {
-        if ($document->getStatus() !== 'signed') {
-            throw new \InvalidArgumentException('Document must be signed');
+        $filePath = $document->getFilePath();
+        if (!file_exists($filePath)) {
+            throw new \InvalidArgumentException('File not found');
         }
-
-        return $document->getFilePath();
+        return $filePath;
     }
 } 

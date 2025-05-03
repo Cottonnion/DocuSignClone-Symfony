@@ -5,6 +5,7 @@ namespace App\Entity;
 use App\Repository\SignatoryRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity(repositoryClass: SignatoryRepository::class)]
 class Signatory
@@ -12,6 +13,7 @@ class Signatory
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['signatory:read'])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(inversedBy: 'signatories')]
@@ -21,32 +23,41 @@ class Signatory
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank]
     #[Assert\Email]
+    #[Groups(['signatory:read', 'signatory:write'])]
     private ?string $email = null;
 
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank]
+    #[Groups(['signatory:read', 'signatory:write'])]
     private ?string $name = null;
 
     #[ORM\Column]
-    private ?int $order = null;
+    #[Groups(['signatory:read', 'signatory:write'])]
+    private ?int $signingOrder = null;
 
     #[ORM\Column(length: 255, unique: true)]
+    #[Groups(['signatory:read'])]
     private ?string $token = null;
 
     #[ORM\Column(length: 20)]
     #[Assert\Choice(choices: ['pending', 'signed', 'declined'])]
+    #[Groups(['signatory:read'])]
     private ?string $status = 'pending';
 
     #[ORM\Column(nullable: true)]
+    #[Groups(['signatory:read'])]
     private ?\DateTimeImmutable $signedAt = null;
 
     #[ORM\Column(length: 45, nullable: true)]
+    #[Groups(['signatory:read'])]
     private ?string $ipAddress = null;
 
     #[ORM\Column(length: 255, nullable: true)]
+    #[Groups(['signatory:read'])]
     private ?string $userAgent = null;
 
     #[ORM\Column]
+    #[Groups(['signatory:read'])]
     private ?bool $signed = false;
 
     public function getId(): ?int
@@ -87,14 +98,14 @@ class Signatory
         return $this;
     }
 
-    public function getOrder(): ?int
+    public function getSigningOrder(): ?int
     {
-        return $this->order;
+        return $this->signingOrder;
     }
 
-    public function setOrder(int $order): static
+    public function setSigningOrder(int $signingOrder): static
     {
-        $this->order = $order;
+        $this->signingOrder = $signingOrder;
         return $this;
     }
 

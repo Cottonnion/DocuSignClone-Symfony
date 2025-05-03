@@ -6,6 +6,7 @@ use App\Repository\WpUserRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity(repositoryClass: WpUserRepository::class)]
 #[ORM\Table(name: 'wp_users')]
@@ -16,9 +17,11 @@ class WpUser implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['document:read', 'user:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 180, unique: true)]
+    #[Groups(['document:read', 'user:read'])]
     private ?string $username = null;
 
     /**
@@ -34,15 +37,19 @@ class WpUser implements UserInterface, PasswordAuthenticatedUserInterface
     private ?string $password = null;
 
     #[ORM\Column(length: 180, unique: true)]
+    #[Groups(['document:read', 'user:read'])]
     private ?string $email = null;
 
     #[ORM\Column]
+    #[Groups(['user:read'])]
     private ?\DateTimeImmutable $createdAt = null;
 
     #[ORM\Column(type: 'datetime', nullable: true)]
+    #[Groups(['user:read'])]
     private ?\DateTimeInterface $lastLoginAt = null;
 
     #[ORM\Column]
+    #[Groups(['user:read'])]
     private bool $isActive = true;
 
     #[ORM\OneToOne(mappedBy: 'user', cascade: ['persist', 'remove'])]
