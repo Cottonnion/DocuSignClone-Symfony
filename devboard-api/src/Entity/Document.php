@@ -187,4 +187,14 @@ class Document
         }
         return $this;
     }
+
+    public function getSignedCount(): int
+    {
+        return $this->signatories->filter(fn(Signatory $signatory) => $signatory->isSigned())->count();
+    }
+
+    public function isFullySigned(): bool
+    {
+        return $this->getSignedCount() === $this->signatories->count();
+    }
 }

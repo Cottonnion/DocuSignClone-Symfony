@@ -3,25 +3,19 @@
 namespace App\Controller;
 
 use App\Entity\Document;
-use App\Entity\Signatory;
-use App\Repository\DocumentRepository;
-use App\Repository\AuditLogRepository;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Service\DocumentService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
-use Symfony\Component\Serializer\SerializerInterface;
 
 #[Route('api/v1/documents')]
 class DocumentController extends AbstractController
 {
     public function __construct(
-        private DocumentRepository $documentRepository,
-        private EntityManagerInterface $entityManager,
-        private SerializerInterface $serializer
+        private DocumentService $documentService
     ) {
     }
 
@@ -32,7 +26,7 @@ class DocumentController extends AbstractController
         $isTemplate = $request->query->get('is_template');
         $createdBy = $request->query->get('created_by');
 
-        $documents = $this->documentRepository->findByFilters($status, $isTemplate, $createdBy);
+        $documents = $this->documentService->getDocuments($status, $isTemplate, $createdBy);
         
         return $this->json($documents);
     }
@@ -40,13 +34,15 @@ class DocumentController extends AbstractController
     #[Route('', name: 'documents_create', methods: ['POST'])]
     public function create(Request $request): JsonResponse
     {
-        $document = $this->serializer->deserialize($request->getContent(), Document::class, 'json');
-        $document->setCreatedBy($this->getUser());
-        
-        $this->entityManager->persist($document);
-        $this->entityManager->flush();
-
-        return $this->json($document, Response::HTTP_CREATED);
+        try {
+            $document = $this->documentService->createDocument(
+                $request->getContent(),
+                $this->getUser()
+            );
+            return $this->json($document, Response::HTTP_CREATED);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
     }
 
     #[Route('/{id}', name: 'documents_get', methods: ['GET'])]
@@ -58,65 +54,65 @@ class DocumentController extends AbstractController
     #[Route('/{id}', name: 'documents_update', methods: ['PUT'])]
     public function update(Document $document, Request $request): JsonResponse
     {
-        $this->serializer->deserialize(
-            $request->getContent(),
-            Document::class,
-            'json',
-            ['object_to_populate' => $document]
-        );
-        
-        $this->entityManager->flush();
-
-        return $this->json($document);
+        try {
+            $document = $this->documentService->updateDocument(
+                $document,
+                $request->getContent()
+            );
+            return $this->json($document);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
     }
 
     #[Route('/{id}', name: 'documents_delete', methods: ['DELETE'])]
     public function delete(Document $document): JsonResponse
     {
-        $this->entityManager->remove($document);
-        $this->entityManager->flush();
-
-        return $this->json(null, Response::HTTP_NO_CONTENT);
+        try {
+            $this->documentService->deleteDocument($document);
+            return $this->json(null, Response::HTTP_NO_CONTENT);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
     }
 
     #[Route('/{id}/audit', name: 'documents_audit', methods: ['GET'])]
-    public function audit(Document $document, AuditLogRepository $auditLogRepository): JsonResponse
+    public function audit(Document $document): JsonResponse
     {
-        $auditLogs = $auditLogRepository->findBy(['document' => $document], ['timestamp' => 'DESC']);
+        $auditLogs = $this->documentService->getAuditLogs($document);
         return $this->json($auditLogs);
     }
 
     #[Route('/{id}/send', name: 'documents_send', methods: ['POST'])]
     public function send(Document $document): JsonResponse
     {
-        if ($document->getStatus() !== 'draft') {
-            return $this->json(['error' => 'Document must be in draft status'], Response::HTTP_BAD_REQUEST);
+        try {
+            $document = $this->documentService->sendDocument($document);
+            return $this->json($document);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
-
-        $document->setStatus('sent');
-        $this->entityManager->flush();
-
-        return $this->json($document);
     }
 
     #[Route('/{id}/remind', name: 'documents_remind', methods: ['POST'])]
     public function remind(Document $document): JsonResponse
     {
-        if ($document->getStatus() !== 'sent') {
-            return $this->json(['error' => 'Document must be in sent status'], Response::HTTP_BAD_REQUEST);
+        try {
+            $this->documentService->remindSignatories($document);
+            return $this->json(['message' => 'Reminders sent']);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
-
-        // TODO: Implement reminder logic
-        return $this->json(['message' => 'Reminders sent']);
     }
 
     #[Route('/{id}/download', name: 'documents_download', methods: ['GET'])]
     public function download(Document $document): Response
     {
-        if ($document->getStatus() !== 'signed') {
-            return $this->json(['error' => 'Document must be signed'], Response::HTTP_BAD_REQUEST);
+        try {
+            $filePath = $this->documentService->getDocumentFile($document);
+            return $this->file($filePath);
+        } catch (\InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         }
-
-        return $this->file($document->getFilePath());
     }
 } 

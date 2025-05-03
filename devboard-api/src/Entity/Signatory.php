@@ -46,6 +46,9 @@ class Signatory
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $userAgent = null;
 
+    #[ORM\Column]
+    private ?bool $signed = false;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -147,6 +150,20 @@ class Signatory
     public function setUserAgent(?string $userAgent): static
     {
         $this->userAgent = $userAgent;
+        return $this;
+    }
+
+    public function isSigned(): bool
+    {
+        return $this->signed;
+    }
+
+    public function setSigned(bool $signed): static
+    {
+        $this->signed = $signed;
+        if ($signed) {
+            $this->signedAt = new \DateTimeImmutable();
+        }
         return $this;
     }
 }
