@@ -4,6 +4,14 @@
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
+    app.login.max_attempts: 5
+    app.login.lockout_minutes: 15
+    app.login.error_messages:
+        invalid_credentials: 'Invalid email or password.'
+        account_locked: 'Account is locked. Please try again later.'
+        account_inactive: 'Account is inactive. Please contact support.'
+        generic_error: 'An error occurred during login.'
+    app.mailer_from: 'noreply@devboard.com'
 
 services:
     # default configuration for services in *this* file
@@ -24,7 +32,15 @@ services:
     App\Service\Auth\LoginService:
         arguments:
             $params: '@parameter_bag'
+            $cache: '@cache.login_attempts_cache'
         tags: ['app.login_service']
+
+    # Explicitly define the MFAService
+    App\Service\Auth\MFAService:
+        arguments:
+            $params: '@parameter_bag'
+            $cache: '@cache.mfa_cache'
+        tags: ['app.mfa_service']
 
     # controllers are imported separately to make sure services can be injected
     # as action arguments even if you don't extend any base controller class
@@ -39,6 +55,7 @@ services:
         tags: 
             - { name: 'kernel.event_subscriber' }
 
+    # JWT Authentication Handlers
     app.authentication_success_handler:
         class: App\Security\AuthenticationSuccessHandler
         parent: lexik_jwt_authentication.handler.authentication_success
@@ -46,6 +63,14 @@ services:
             $jwtManager: '@lexik_jwt_authentication.jwt_manager'
             $dispatcher: '@event_dispatcher'
             $tokenRefreshService: '@App\Service\Auth\TokenRefreshService'
+
+    app.authentication_failure_handler:
+        class: App\Security\AuthenticationFailureHandler
+        parent: lexik_jwt_authentication.handler.authentication_failure
+        arguments:
+            $dispatcher: '@event_dispatcher'
+        tags:
+            - { name: 'kernel.event_listener', event: 'lexik_jwt_authentication.on_authentication_failure', method: 'onAuthenticationFailure' }
 
     App\Security\RateLimitResponseHandler:
         tags:
@@ -68,3 +93,26 @@ services:
             $debug: true
         tags:
             - { name: 'kernel.event_subscriber' }
+
+    App\Service\PasswordResetService:
+        arguments:
+            $logger: '@monolog.logger.user'
+
+    # Cache services
+    cache.mfa_cache:
+        class: Symfony\Component\Cache\Adapter\FilesystemAdapter
+        arguments:
+            - 'mfa_cache'
+            - 0
+            - '%kernel.cache_dir%/pools'
+        tags:
+            - { name: 'cache.pool' }
+
+    cache.login_attempts_cache:
+        class: Symfony\Component\Cache\Adapter\FilesystemAdapter
+        arguments:
+            - 'login_attempts_cache'
+            - 0
+            - '%kernel.cache_dir%/pools'
+        tags:
+            - { name: 'cache.pool' }

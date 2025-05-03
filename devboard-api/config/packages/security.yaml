@@ -19,15 +19,7 @@ security:
         login:
             pattern: ^/api/user/validate_login
             stateless: true
-            json_login:
-                check_path: /api/user/validate_login
-                success_handler: app.authentication_success_handler
-                failure_handler: lexik_jwt_authentication.handler.authentication_failure
-                username_path: email
-                password_path: password
-            login_throttling:
-                max_attempts: 5
-                interval: '15 minutes'
+            security: false
         api:
             pattern: ^/api
             stateless: true

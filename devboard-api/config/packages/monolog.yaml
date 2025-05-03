@@ -1,6 +1,7 @@
 monolog:
     channels:
-        - deprecation # Deprecations are logged in the dedicated "deprecation" channel when it exists
+        - deprecation
+        - user
 
 when@dev:
     monolog:
@@ -31,6 +32,12 @@ when@dev:
             #chromephp:
             #    type: chromephp
             #    level: info
+            user:
+                type: stream
+                path: "%kernel.logs_dir%/user.log"
+                level: debug
+                channels: ["user"]
+                formatter: monolog.formatter.line
 
 when@test:
     monolog:
@@ -69,3 +76,9 @@ when@prod:
                 channels: [deprecation]
                 path: php://stderr
                 formatter: monolog.formatter.json
+            user:
+                type: stream
+                path: "%kernel.logs_dir%/user.log"
+                level: debug
+                channels: ["user"]
+                formatter: monolog.formatter.line

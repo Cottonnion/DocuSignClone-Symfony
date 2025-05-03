@@ -14,6 +14,16 @@ framework:
         # APCu (not recommended with heavy random-write workloads as memory fragmentation can cause perf issues)
         #app: cache.adapter.apcu
 
-        # Namespaced pools use the above "app" backend by default
-        #pools:
-            #my.dedicated.cache: null
+        # The app.cache service is used to store the application cache
+        app: cache.adapter.filesystem
+        # The system.cache service is used to store the system cache
+        system: cache.adapter.system
+
+        # Configure the filesystem adapter
+        pools:
+            mfa_cache:
+                adapter: cache.adapter.filesystem
+                default_lifetime: 3600
+            login_attempts_cache:
+                adapter: cache.adapter.filesystem
+                default_lifetime: 3600
