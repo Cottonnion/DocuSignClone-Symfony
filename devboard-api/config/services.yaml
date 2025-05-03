@@ -12,6 +12,7 @@ parameters:
         account_inactive: 'Account is inactive. Please contact support.'
         generic_error: 'An error occurred during login.'
     app.mailer_from: 'noreply@devboard.com'
+    upload_directory: '%kernel.project_dir%/public/uploads'
 
 services:
     # default configuration for services in *this* file
@@ -116,3 +117,7 @@ services:
             - '%kernel.cache_dir%/pools'
         tags:
             - { name: 'cache.pool' }
+
+    App\Controller\DocumentController:
+        arguments:
+            $uploadDirectory: '%upload_directory%'
