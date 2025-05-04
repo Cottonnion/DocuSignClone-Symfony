@@ -8,6 +8,7 @@
 /vendor/
 /vendor/*
 !/vendor/.gitkeep
+/public/uploads/
 ###< symfony/framework-bundle ###
 
 ###> lexik/jwt-authentication-bundle ###
