@@ -9,6 +9,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\String\Slugger\SluggerInterface;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 class DocumentVersionService
 {
@@ -27,11 +28,17 @@ class DocumentVersionService
         }
     }
 
-    public function createVersion(Document $document, ?string $changeDescription = null): DocumentVersion
-    {
+    public function createVersion(
+        Document $document,
+        ?string $changeDescription = null,
+        ?UploadedFile $file = null,
+        ?array $tags = null,
+        ?array $metadata = null,
+        bool $isMajor = false
+    ): DocumentVersion {
         // Get the latest version number
         $latestVersion = $this->versionRepository->findLatestVersion($document);
-        $versionNumber = $latestVersion ? $this->incrementVersion($latestVersion->getVersionNumber()) : '1.0';
+        $versionNumber = $latestVersion ? $this->incrementVersion($latestVersion->getVersionNumber(), $isMajor) : '1.0';
 
         // Create new version
         $version = new DocumentVersion();
@@ -39,39 +46,69 @@ class DocumentVersionService
         $version->setVersionNumber($versionNumber);
         $version->setChangeDescription($changeDescription);
         $version->setCreatedBy($document->getCreatedBy());
+        $version->setTags($tags);
+        $version->setMetadata($metadata);
+        $version->setIsMajor($isMajor);
 
-        // Copy the file to versioned storage
-        $originalFilePath = $document->getFilePath();
-        $versionedFilePath = $this->createVersionedFilePath($document, $versionNumber);
-        
-        $filesystem = new Filesystem();
-        
-        // Log the paths for debugging
-        $this->logger->info('Creating version', [
-            'originalFilePath' => $originalFilePath,
-            'versionedFilePath' => $versionedFilePath,
-            'uploadDirectory' => $this->uploadDirectory,
-            'versionedUploadDirectory' => $this->versionedUploadDirectory
-        ]);
+        // Handle file upload
+        if ($file) {
+            // Validate file type
+            $allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+            if (!in_array($file->getMimeType(), $allowedMimeTypes)) {
+                throw new \InvalidArgumentException('Invalid file type. Allowed types: PDF, JPEG, PNG');
+            }
 
-        // Ensure the source file exists
-        $sourcePath = $this->uploadDirectory . '/' . basename($originalFilePath);
-        if (!file_exists($sourcePath)) {
-            $this->logger->error('Source file not found', ['path' => $sourcePath]);
-            throw new \RuntimeException(sprintf('Source file "%s" does not exist', $sourcePath));
+            // Get file metadata before moving
+            $fileSize = $file->getSize();
+            $fileType = $file->getMimeType();
+
+            // Generate unique filename
+            $originalFilename = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+            $safeFilename = $this->slugger->slug($originalFilename);
+            $newFilename = $safeFilename . '-v' . $versionNumber . '.' . $file->guessExtension();
+
+            // Move file to versioned location
+            $file->move($this->versionedUploadDirectory, $newFilename);
+
+            // Set file metadata
+            $version->setFilePath($newFilename);
+            $version->setFileSize($fileSize);
+            $version->setFileType($fileType);
+        } else {
+            // Copy the current file to versioned storage
+            $originalFilePath = $document->getFilePath();
+            $versionedFilePath = $this->createVersionedFilePath($document, $versionNumber);
+            
+            $filesystem = new Filesystem();
+            
+            // Log the paths for debugging
+            $this->logger->info('Creating version', [
+                'originalFilePath' => $originalFilePath,
+                'versionedFilePath' => $versionedFilePath,
+                'uploadDirectory' => $this->uploadDirectory,
+                'versionedUploadDirectory' => $this->versionedUploadDirectory
+            ]);
+
+            // Ensure the source file exists
+            $sourcePath = $this->uploadDirectory . '/' . basename($originalFilePath);
+            if (!file_exists($sourcePath)) {
+                $this->logger->error('Source file not found', ['path' => $sourcePath]);
+                throw new \RuntimeException(sprintf('Source file "%s" does not exist', $sourcePath));
+            }
+
+            // Get file metadata before copying
+            $fileSize = filesize($sourcePath);
+            $fileType = mime_content_type($sourcePath);
+
+            // Copy to versioned location
+            $targetPath = $this->versionedUploadDirectory . '/' . $versionedFilePath;
+            $filesystem->copy($sourcePath, $targetPath);
+
+            // Set file metadata
+            $version->setFilePath($versionedFilePath);
+            $version->setFileSize($fileSize);
+            $version->setFileType($fileType);
         }
-
-        // Copy to versioned location
-        $targetPath = $this->versionedUploadDirectory . '/' . $versionedFilePath;
-        $filesystem->copy($sourcePath, $targetPath);
-
-        // Verify the copy was successful
-        if (!file_exists($targetPath)) {
-            $this->logger->error('Failed to create versioned file', ['path' => $targetPath]);
-            throw new \RuntimeException(sprintf('Failed to create versioned file at "%s"', $targetPath));
-        }
-
-        $version->setFilePath($versionedFilePath);
 
         $this->entityManager->persist($version);
         $this->entityManager->flush();
@@ -90,7 +127,10 @@ class DocumentVersionService
             throw new \RuntimeException(sprintf('Version file "%s" does not exist', $sourcePath));
         }
 
-        $targetPath = $this->uploadDirectory . '/' . basename($document->getFilePath());
+        // Update the document's filePath to match the restored version
+        $document->setFilePath($version->getFilePath());
+        
+        $targetPath = $this->uploadDirectory . '/' . basename($version->getFilePath());
         $filesystem->copy($sourcePath, $targetPath, true);
 
         // Update document metadata
@@ -98,11 +138,15 @@ class DocumentVersionService
         $this->entityManager->flush();
     }
 
-    private function incrementVersion(string $versionNumber): string
+    private function incrementVersion(string $versionNumber, bool $isMajor = false): string
     {
         $parts = explode('.', $versionNumber);
         $major = (int)$parts[0];
         $minor = isset($parts[1]) ? (int)$parts[1] : 0;
+        
+        if ($isMajor) {
+            return ($major + 1) . '.0';
+        }
         
         return $major . '.' . ($minor + 1);
     }
