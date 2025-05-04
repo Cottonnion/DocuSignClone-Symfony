@@ -61,11 +61,16 @@ class Document
     #[Groups(['document:read'])]
     private Collection $signatories;
 
+    #[ORM\OneToMany(mappedBy: 'document', targetEntity: DocumentVersion::class, orphanRemoval: true)]
+    #[Groups(['document:read'])]
+    private Collection $versions;
+
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
         $this->signatories = new ArrayCollection();
+        $this->versions = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -207,5 +212,35 @@ class Document
     public function isFullySigned(): bool
     {
         return $this->getSignedCount() === $this->signatories->count();
+    }
+
+    /**
+     * @return Collection<int, DocumentVersion>
+     */
+    public function getVersions(): Collection
+    {
+        return $this->versions;
+    }
+
+    public function addVersion(DocumentVersion $version): static
+    {
+        if (!$this->versions->contains($version)) {
+            $this->versions->add($version);
+            $version->setDocument($this);
+        }
+
+        return $this;
+    }
+
+    public function removeVersion(DocumentVersion $version): static
+    {
+        if ($this->versions->removeElement($version)) {
+            // set the owning side to null (unless already changed)
+            if ($version->getDocument() === $this) {
+                $version->setDocument(null);
+            }
+        }
+
+        return $this;
     }
 }

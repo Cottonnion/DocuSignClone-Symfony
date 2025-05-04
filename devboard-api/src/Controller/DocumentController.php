@@ -179,16 +179,13 @@ class DocumentController extends AbstractController
     {
         try {
             $filePath = $document->getFilePath();
-            // Extract just the filename from the path
-            $filename = basename($filePath);
-            $fullPath = $this->uploadDirectory.'/'.$filename;
+            $fullPath = $this->uploadDirectory.'/'.$filePath;
             
             if (!file_exists($fullPath)) {
                 return $this->json([
                     'error' => 'File not found',
                     'details' => [
-                        'original_path' => $filePath,
-                        'filename' => $filename,
+                        'filepath' => $filePath,
                         'full_path' => $fullPath,
                         'upload_dir' => $this->uploadDirectory
                     ]
