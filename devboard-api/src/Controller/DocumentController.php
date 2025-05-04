@@ -15,6 +15,29 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\String\Slugger\SluggerInterface;
 
+/**
+ * Controller handling document management operations.
+ * 
+ * This controller provides endpoints for:
+ * - Listing documents with various filters
+ * - Creating new documents
+ * - Retrieving document details
+ * - Updating document information
+ * - Deleting documents
+ * - Managing document audit logs
+ * - Sending documents for signing
+ * - Sending reminders to signatories
+ * - Uploading document files
+ * - Downloading document files
+ * 
+ * Documents can be in various states:
+ * - draft: Initial state when created
+ * - sent: When sent to signatories
+ * - signed: When all signatories have signed
+ * - cancelled: When the signing process is cancelled
+ * 
+ * @Route('api/v1/documents')
+ */
 #[Route('api/v1/documents')]
 class DocumentController extends AbstractController
 {
@@ -27,6 +50,43 @@ class DocumentController extends AbstractController
     ) {
     }
 
+    /**
+     * List documents with optional filters.
+     * 
+     * Retrieves a list of documents, optionally filtered by:
+     * - Status (draft, sent, signed, cancelled)
+     * - Template status
+     * - Creator
+     * 
+     * @param Request $request The request containing optional query parameters
+     * @return JsonResponse
+     * 
+     * @Route('', name: 'documents_list', methods: ['GET'])
+     * 
+     * Query parameters:
+     * - status: Filter by document status
+     * - is_template: Filter by template status (true/false)
+     * - created_by: Filter by creator ID
+     * 
+     * Response format:
+     * [
+     *   {
+     *     "id": 1,
+     *     "title": "Document Title",
+     *     "filePath": "document.pdf",
+     *     "status": "draft",
+     *     "createdBy": {
+     *       "id": 1,
+     *       "username": "user1"
+     *     },
+     *     "createdAt": "2025-05-04T11:32:33+00:00",
+     *     "updatedAt": "2025-05-04T11:32:33+00:00",
+     *     "signDeadline": "2025-05-11T11:32:33+00:00",
+     *     "isTemplate": false
+     *   },
+     *   ...
+     * ]
+     */
     #[Route('', name: 'documents_list', methods: ['GET'])]
     public function list(Request $request): JsonResponse
     {
@@ -40,6 +100,40 @@ class DocumentController extends AbstractController
         return new JsonResponse($json, Response::HTTP_OK, [], true);
     }
 
+    /**
+     * Create a new document.
+     * 
+     * Creates a new document with the provided information.
+     * 
+     * @param Request $request The request containing document data
+     * @return JsonResponse
+     * 
+     * @Route('', name: 'documents_create', methods: ['POST'])
+     * 
+     * Request body:
+     * {
+     *   "title": "Document Title",
+     *   "status": "draft",
+     *   "signDeadline": "2025-05-11T11:32:33+00:00",
+     *   "isTemplate": false
+     * }
+     * 
+     * Response format:
+     * {
+     *   "id": 1,
+     *   "title": "Document Title",
+     *   "filePath": "document.pdf",
+     *   "status": "draft",
+     *   "createdBy": {
+     *     "id": 1,
+     *     "username": "user1"
+     *   },
+     *   "createdAt": "2025-05-04T11:32:33+00:00",
+     *   "updatedAt": "2025-05-04T11:32:33+00:00",
+     *   "signDeadline": "2025-05-11T11:32:33+00:00",
+     *   "isTemplate": false
+     * }
+     */
     #[Route('', name: 'documents_create', methods: ['POST'])]
     public function create(Request $request): JsonResponse
     {
@@ -55,6 +149,32 @@ class DocumentController extends AbstractController
         }
     }
 
+    /**
+     * Get document details.
+     * 
+     * Retrieves detailed information about a specific document.
+     * 
+     * @param Document $document The document to retrieve
+     * @return JsonResponse
+     * 
+     * @Route('/{id}', name: 'documents_get', methods: ['GET'])
+     * 
+     * Response format:
+     * {
+     *   "id": 1,
+     *   "title": "Document Title",
+     *   "filePath": "document.pdf",
+     *   "status": "draft",
+     *   "createdBy": {
+     *     "id": 1,
+     *     "username": "user1"
+     *   },
+     *   "createdAt": "2025-05-04T11:32:33+00:00",
+     *   "updatedAt": "2025-05-04T11:32:33+00:00",
+     *   "signDeadline": "2025-05-11T11:32:33+00:00",
+     *   "isTemplate": false
+     * }
+     */
     #[Route('/{id}', name: 'documents_get', methods: ['GET'])]
     public function get(Document $document): JsonResponse
     {
@@ -62,6 +182,41 @@ class DocumentController extends AbstractController
         return new JsonResponse($json, Response::HTTP_OK, [], true);
     }
 
+    /**
+     * Update document information.
+     * 
+     * Updates the information of an existing document.
+     * 
+     * @param Document $document The document to update
+     * @param Request $request The request containing updated document data
+     * @return JsonResponse
+     * 
+     * @Route('/{id}', name: 'documents_update', methods: ['PUT'])
+     * 
+     * Request body:
+     * {
+     *   "title": "Updated Title",
+     *   "status": "sent",
+     *   "signDeadline": "2025-05-11T11:32:33+00:00",
+     *   "isTemplate": false
+     * }
+     * 
+     * Response format:
+     * {
+     *   "id": 1,
+     *   "title": "Updated Title",
+     *   "filePath": "document.pdf",
+     *   "status": "sent",
+     *   "createdBy": {
+     *     "id": 1,
+     *     "username": "user1"
+     *   },
+     *   "createdAt": "2025-05-04T11:32:33+00:00",
+     *   "updatedAt": "2025-05-04T11:32:33+00:00",
+     *   "signDeadline": "2025-05-11T11:32:33+00:00",
+     *   "isTemplate": false
+     * }
+     */
     #[Route('/{id}', name: 'documents_update', methods: ['PUT'])]
     public function update(Document $document, Request $request): JsonResponse
     {
@@ -77,6 +232,18 @@ class DocumentController extends AbstractController
         }
     }
 
+    /**
+     * Delete a document.
+     * 
+     * Removes a document and all associated data from the system.
+     * 
+     * @param Document $document The document to delete
+     * @return JsonResponse
+     * 
+     * @Route('/{id}', name: 'documents_delete', methods: ['DELETE'])
+     * 
+     * Response: 204 No Content
+     */
     #[Route('/{id}', name: 'documents_delete', methods: ['DELETE'])]
     public function delete(Document $document): JsonResponse
     {
@@ -88,6 +255,36 @@ class DocumentController extends AbstractController
         }
     }
 
+    /**
+     * Get document audit logs.
+     * 
+     * Retrieves the audit history of a document, including all actions
+     * performed on it and by whom.
+     * 
+     * @param Document $document The document to get audit logs for
+     * @return JsonResponse
+     * 
+     * @Route('/{id}/audit', name: 'documents_audit', methods: ['GET'])
+     * 
+     * Response format:
+     * [
+     *   {
+     *     "id": 1,
+     *     "action": "created",
+     *     "timestamp": "2025-05-04T11:32:33+00:00",
+     *     "performedBy": {
+     *       "id": 1,
+     *       "username": "user1"
+     *     },
+     *     "meta": {
+     *       "field": "status",
+     *       "oldValue": "draft",
+     *       "newValue": "sent"
+     *     }
+     *   },
+     *   ...
+     * ]
+     */
     #[Route('/{id}/audit', name: 'documents_audit', methods: ['GET'])]
     public function audit(Document $document): JsonResponse
     {
@@ -95,6 +292,34 @@ class DocumentController extends AbstractController
         return $this->json($auditLogs);
     }
 
+    /**
+     * Send a document for signing.
+     * 
+     * Initiates the signing process for a document, notifying all signatories
+     * and updating the document status.
+     * 
+     * @param Document $document The document to send for signing
+     * @return JsonResponse
+     * 
+     * @Route('/{id}/send', name: 'documents_send', methods: ['POST'])
+     * 
+     * Response format:
+     * {
+     *   "id": 1,
+     *   "title": "Document Title",
+     *   "status": "sent",
+     *   "signatories": [
+     *     {
+     *       "id": 1,
+     *       "email": "signatory@example.com",
+     *       "name": "John Doe",
+     *       "signingOrder": 1,
+     *       "signed": false
+     *     },
+     *     ...
+     *   ]
+     * }
+     */
     #[Route('/{id}/send', name: 'documents_send', methods: ['POST'])]
     public function send(Document $document): JsonResponse
     {
@@ -106,6 +331,21 @@ class DocumentController extends AbstractController
         }
     }
 
+    /**
+     * Send reminders to signatories.
+     * 
+     * Sends reminder emails to signatories who haven't signed the document yet.
+     * 
+     * @param Document $document The document to send reminders for
+     * @return JsonResponse
+     * 
+     * @Route('/{id}/remind', name: 'documents_remind', methods: ['POST'])
+     * 
+     * Response format:
+     * {
+     *   "message": "Reminders sent"
+     * }
+     */
     #[Route('/{id}/remind', name: 'documents_remind', methods: ['POST'])]
     public function remind(Document $document): JsonResponse
     {
@@ -117,6 +357,37 @@ class DocumentController extends AbstractController
         }
     }
 
+    /**
+     * Upload a document file.
+     * 
+     * Uploads a new document file to the system. Supported file types:
+     * - PDF (.pdf)
+     * - JPEG images (.jpg, .jpeg)
+     * - PNG images (.png)
+     * 
+     * @param Request $request The request containing the file to upload
+     * @return JsonResponse
+     * 
+     * @Route('/upload', name: 'documents_upload', methods: ['POST'])
+     * 
+     * Request format:
+     * - Content-Type: multipart/form-data
+     * - Body: file: [binary file data]
+     * 
+     * Response format:
+     * {
+     *   "id": 1,
+     *   "title": "Original Filename",
+     *   "filePath": "unique-filename.pdf",
+     *   "status": "draft",
+     *   "createdBy": {
+     *     "id": 1,
+     *     "username": "user1"
+     *   },
+     *   "createdAt": "2025-05-04T11:32:33+00:00",
+     *   "updatedAt": "2025-05-04T11:32:33+00:00"
+     * }
+     */
     #[Route('/upload', name: 'documents_upload', methods: ['POST'])]
     public function upload(Request $request): JsonResponse
     {
@@ -174,6 +445,21 @@ class DocumentController extends AbstractController
         }
     }
 
+    /**
+     * Download a document file.
+     * 
+     * Downloads the file associated with a document.
+     * 
+     * @param Document $document The document to download
+     * @return Response
+     * 
+     * @Route('/{id}/download', name: 'documents_download', methods: ['GET'])
+     * 
+     * Response:
+     * - Content-Type: application/octet-stream
+     * - Content-Disposition: attachment; filename="document.pdf"
+     * - Body: Binary file data
+     */
     #[Route('/{id}/download', name: 'documents_download', methods: ['GET'])]
     public function download(Document $document): Response
     {
