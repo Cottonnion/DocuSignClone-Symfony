@@ -13,6 +13,7 @@ parameters:
         generic_error: 'An error occurred during login.'
     app.mailer_from: 'noreply@devboard.com'
     upload_directory: '%kernel.project_dir%/public/uploads'
+    versioned_upload_directory: '%kernel.project_dir%/public/uploads/versions'
 
 services:
     # default configuration for services in *this* file
@@ -26,8 +27,9 @@ services:
         resource: '../src/'
         exclude:
             - '../src/DependencyInjection/'
-            - '../src/Entity/'
             - '../src/Kernel.php'
+            # Remove Entity from exclude list to allow autowiring
+            # - '../src/Entity/'
 
     # Explicitly define the LoginService
     App\Service\Auth\LoginService:
@@ -42,6 +44,13 @@ services:
             $params: '@parameter_bag'
             $cache: '@cache.mfa_cache'
         tags: ['app.mfa_service']
+
+    # Explicitly define the DocumentVersionService
+    App\Service\DocumentVersionService:
+        arguments:
+            $uploadDirectory: '%upload_directory%'
+            $versionedUploadDirectory: '%versioned_upload_directory%'
+        tags: ['app.document_version_service']
 
     # controllers are imported separately to make sure services can be injected
     # as action arguments even if you don't extend any base controller class
