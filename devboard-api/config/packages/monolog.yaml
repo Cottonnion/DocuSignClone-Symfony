@@ -33,11 +33,14 @@ when@dev:
             #    type: chromephp
             #    level: info
             user:
-                type: stream
+                type: rotating_file
                 path: "%kernel.logs_dir%/user.log"
                 level: debug
                 channels: ["user"]
                 formatter: monolog.formatter.line
+                max_files: 30
+                date_format: 'Y-m-d'
+                filename_format: '{filename}-{date}'
 
 when@test:
     monolog:
@@ -77,8 +80,11 @@ when@prod:
                 path: php://stderr
                 formatter: monolog.formatter.json
             user:
-                type: stream
+                type: rotating_file
                 path: "%kernel.logs_dir%/user.log"
                 level: debug
                 channels: ["user"]
                 formatter: monolog.formatter.line
+                max_files: 30
+                date_format: 'Y-m-d'
+                filename_format: '{filename}-{date}'

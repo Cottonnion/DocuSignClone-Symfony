@@ -14,6 +14,8 @@ parameters:
     app.mailer_from: 'noreply@devboard.com'
     upload_directory: '%kernel.project_dir%/public/uploads'
     versioned_upload_directory: '%kernel.project_dir%/public/uploads/versions'
+    app.log_integrity_key: '%env(APP_LOG_INTEGRITY_KEY)%'
+    document_upload_directory: '%kernel.project_dir%/public/uploads/documents'
 
 services:
     # default configuration for services in *this* file
@@ -45,12 +47,62 @@ services:
             $cache: '@cache.mfa_cache'
         tags: ['app.mfa_service']
 
-    # Explicitly define the DocumentVersionService
-    App\Service\DocumentVersionService:
+    # Document Services
+    App\Service\Document\DocumentService:
+        arguments:
+            $uploadDirectory: '%upload_directory%'
+        tags: ['app.document_service']
+
+    App\Service\Document\DocumentVersionService:
         arguments:
             $uploadDirectory: '%upload_directory%'
             $versionedUploadDirectory: '%versioned_upload_directory%'
         tags: ['app.document_version_service']
+
+    # Security Services
+    App\Service\Security\LogIntegrityService:
+        arguments:
+            $logger: '@monolog.logger.user'
+            $secretKey: '%app.log_integrity_key%'
+        tags: ['app.log_integrity_service']
+
+    # User Services
+    App\Service\User\PasswordResetService:
+        arguments:
+            $logger: '@monolog.logger.user'
+            $params: '@parameter_bag'
+            $mailer: '@mailer'
+            $urlGenerator: '@router.default'
+            $twig: '@twig'
+        tags: ['app.password_reset_service']
+
+    # Cache services
+    cache.mfa_cache:
+        class: Symfony\Component\Cache\Adapter\FilesystemAdapter
+        arguments:
+            - 'mfa_cache'
+            - 0
+            - '%kernel.cache_dir%/pools'
+        tags:
+            - { name: 'cache.pool' }
+
+    cache.login_attempts_cache:
+        class: Symfony\Component\Cache\Adapter\FilesystemAdapter
+        arguments:
+            - 'login_attempts_cache'
+            - 0
+            - '%kernel.cache_dir%/pools'
+        tags:
+            - { name: 'cache.pool' }
+
+    cache.email_token_cache:
+        class: Symfony\Component\Cache\Adapter\FilesystemAdapter
+        arguments:
+            - 'email_token_cache'
+            - 0
+            - '%kernel.cache_dir%/pools'
+        tags:
+            - { name: 'cache.pool' }
 
     # controllers are imported separately to make sure services can be injected
     # as action arguments even if you don't extend any base controller class
@@ -104,29 +156,6 @@ services:
         tags:
             - { name: 'kernel.event_subscriber' }
 
-    App\Service\PasswordResetService:
-        arguments:
-            $logger: '@monolog.logger.user'
-
-    # Cache services
-    cache.mfa_cache:
-        class: Symfony\Component\Cache\Adapter\FilesystemAdapter
-        arguments:
-            - 'mfa_cache'
-            - 0
-            - '%kernel.cache_dir%/pools'
-        tags:
-            - { name: 'cache.pool' }
-
-    cache.login_attempts_cache:
-        class: Symfony\Component\Cache\Adapter\FilesystemAdapter
-        arguments:
-            - 'login_attempts_cache'
-            - 0
-            - '%kernel.cache_dir%/pools'
-        tags:
-            - { name: 'cache.pool' }
-
     App\Controller\DocumentController:
         arguments:
-            $uploadDirectory: '%upload_directory%'
+            $uploadDirectory: '%document_upload_directory%'
