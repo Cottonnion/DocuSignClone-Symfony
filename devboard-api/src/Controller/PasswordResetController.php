@@ -4,7 +4,7 @@ namespace App\Controller;
 
 use App\DTO\PasswordResetRequestDTO;
 use App\DTO\PasswordResetDTO;
-use App\Service\PasswordResetService;
+use App\Service\User\PasswordResetService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
