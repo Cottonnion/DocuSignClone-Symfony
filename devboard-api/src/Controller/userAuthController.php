@@ -43,8 +43,20 @@ final class UserAuthController extends AbstractController
     public function loginUser(Request $request): JsonResponse
     {
         try {
+            // First check for refresh token in headers
+            $refreshToken = $request->headers->get('X-Refresh-Token');
+            if ($refreshToken) {
+                // Try to validate using refresh token
+                $result = $this->loginService->validateLoginWithRefreshToken($refreshToken);
+                if ($result['status'] === 'success') {
+                    return $this->json($result, Response::HTTP_OK, $this->getSecurityHeaders());
+                }
+                // If refresh token validation fails, return error
+                return $this->json($result, Response::HTTP_UNAUTHORIZED, $this->getSecurityHeaders());
+            }
+
+            // If no refresh token, check for email/password in body
             $data = json_decode($request->getContent(), true);
-            
             if (!$data) {
                 return $this->json([
                     'status' => 'error',
@@ -77,8 +89,8 @@ final class UserAuthController extends AbstractController
                         ], Response::HTTP_UNAUTHORIZED, $this->getSecurityHeaders());
                     }
 
-                    // If MFA verification successful, proceed with login
-                    $result = $this->loginService->validateLogin($mfaDTO->email);
+                    // If MFA verification successful, generate tokens
+                    $result = $this->loginService->handleSuccessfulMFA($mfaDTO->email);
                     return $this->json($result, Response::HTTP_OK, $this->getSecurityHeaders());
                 } catch (\Exception $e) {
                     return $this->json([

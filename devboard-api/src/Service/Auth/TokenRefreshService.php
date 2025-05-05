@@ -114,5 +114,42 @@ class TokenRefreshService
 
         $this->entityManager->flush();
     }
+
+    /**
+     * @param WpUser $user User to check for valid refresh token
+     * @return RefreshToken|null Valid refresh token if exists
+     */
+    public function getValidRefreshToken(WpUser $user): ?RefreshToken
+    {
+        $token = $this->refreshTokenRepository->findOneBy([
+            'user' => $user,
+            'is_active' => true
+        ]);
+
+        if ($token && !$token->isExpired()) {
+            return $token;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param string $refreshToken Raw refresh token to validate
+     * @return RefreshToken|null Valid refresh token if exists
+     */
+    public function getValidRefreshTokenByToken(string $refreshToken): ?RefreshToken
+    {
+        $hashedToken = hash('sha256', $refreshToken);
+        $token = $this->refreshTokenRepository->findOneBy([
+            'refresh_token' => $hashedToken,
+            'is_active' => true
+        ]);
+
+        if ($token && !$token->isExpired()) {
+            return $token;
+        }
+
+        return null;
+    }
 }
 

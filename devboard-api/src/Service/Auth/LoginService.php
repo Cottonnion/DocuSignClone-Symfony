@@ -16,6 +16,7 @@ use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use App\Service\Auth\MFAService;
 
 class LoginService
 {
@@ -34,6 +35,7 @@ class LoginService
         private IpRateLimiterService $ipRateLimiter,
         private EntityManagerInterface $entityManager,
         private TokenRefreshService $tokenRefreshService,
+        private MFAService $mfaService,
         private ParameterBagInterface $params,
         private CacheInterface $cache
     ) {
@@ -195,7 +197,7 @@ class LoginService
         return $user;
     }
 
-    public function validateLogin(string $email): array
+    public function validateLogin(string $email, ?string $password = null): array
     {
         $user = $this->userRepository->findOneBy(['email' => $email]);
         if (!$user) {
@@ -205,16 +207,50 @@ class LoginService
             ];
         }
 
-        // Generate JWT token
-        $token = $this->jwtManager->create($user);
+        // Validate credentials if password is provided
+        if ($password && !$this->validateCredentials($email, $password)) {
+            return [
+                'status' => 'error',
+                'message' => 'Invalid credentials'
+            ];
+        }
 
+        // Send MFA code
+        $this->mfaService->generateAndSendMFACode($user);
+        
+        return [
+            'status' => 'success',
+            'message' => 'Verification code sent to your email',
+            'email' => $email
+        ];
+    }
+
+    public function validateLoginWithRefreshToken(string $refreshToken): array
+    {
+        // Find the refresh token in database
+        $tokenEntity = $this->tokenRefreshService->getValidRefreshTokenByToken($refreshToken);
+
+        if (!$tokenEntity) {
+            return [
+                'status' => 'error',
+                'message' => 'Invalid or expired refresh token'
+            ];
+        }
+
+        $user = $tokenEntity->getUser();
+        
+        // Generate new tokens
+        $tokens = $this->tokenRefreshService->generateTokens($user);
+        
         // Update last login time
         $user->setLastLoginAt(new \DateTime());
         $this->entityManager->flush();
 
         return [
             'status' => 'success',
-            'token' => $token,
+            'access_token' => $tokens['access_token'],
+            'refresh_token' => $tokens['refresh_token'],
+            'expires_in' => $tokens['expires_in'],
             'user' => [
                 'id' => $user->getId(),
                 'email' => $user->getEmail(),
@@ -241,5 +277,35 @@ class LoginService
         });
 
         return false;
+    }
+
+    public function handleSuccessfulMFA(string $email): array
+    {
+        $user = $this->userRepository->findOneBy(['email' => $email]);
+        if (!$user) {
+            return [
+                'status' => 'error',
+                'message' => 'User not found'
+            ];
+        }
+
+        // Generate new tokens
+        $tokens = $this->tokenRefreshService->generateTokens($user);
+        
+        // Update last login time
+        $user->setLastLoginAt(new \DateTime());
+        $this->entityManager->flush();
+
+        return [
+            'status' => 'success',
+            'access_token' => $tokens['access_token'],
+            'refresh_token' => $tokens['refresh_token'],
+            'expires_in' => $tokens['expires_in'],
+            'user' => [
+                'id' => $user->getId(),
+                'email' => $user->getEmail(),
+                'roles' => $user->getRoles()
+            ]
+        ];
     }
 }
