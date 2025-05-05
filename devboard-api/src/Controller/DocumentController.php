@@ -3,7 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Document;
-use App\Service\DocumentService;
+use App\Service\Document\DocumentService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -14,6 +14,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\String\Slugger\SluggerInterface;
+use Psr\Log\LoggerInterface;
 
 /**
  * Controller handling document management operations.
@@ -46,7 +47,8 @@ class DocumentController extends AbstractController
         private EntityManagerInterface $entityManager,
         private string $uploadDirectory,
         private SluggerInterface $slugger,
-        private SerializerInterface $serializer
+        private SerializerInterface $serializer,
+        private LoggerInterface $logger
     ) {
     }
 
@@ -138,14 +140,237 @@ class DocumentController extends AbstractController
     public function create(Request $request): JsonResponse
     {
         try {
-            $document = $this->documentService->createDocument(
-                $request->getContent(),
-                $this->getUser()
-            );
+            $content = $request->getContent();
+            $file = $request->files->get('file');
+            $contentType = $request->headers->get('Content-Type', '');
+            $debug = [
+                'content_type' => $contentType,
+                'raw_content' => $content,
+                'form_fields' => $request->request->all(),
+                'files' => $request->files->all(),
+            ];
+            
+            // Handle form data with file upload
+            if (strpos($contentType, 'multipart/form-data') !== false) {
+                $documentData = [
+                    'title' => $request->request->get('title'),
+                    'status' => $request->request->get('status', 'draft'),
+                    'signDeadline' => $request->request->get('signDeadline'),
+                    'isTemplate' => filter_var($request->request->get('isTemplate', false), FILTER_VALIDATE_BOOLEAN)
+                ];
+                $content = json_encode($documentData);
+                $debug['document_data'] = $documentData;
+            }
+            
+            // Check if request body is empty
+            if (empty($content)) {
+                return $this->json([
+                    'status' => 'error',
+                    'message' => 'Missing required fields',
+                    'details' => [
+                        'required_fields' => [
+                            'title' => 'Document title is required',
+                            'status' => 'Document status is required (draft, sent, signed, cancelled)',
+                            'signDeadline' => 'Signing deadline is required (ISO 8601 format)'
+                        ],
+                        'optional_fields' => [
+                            'isTemplate' => 'Whether this is a template document (default: false)',
+                            'file' => 'Document file (PDF, JPEG, PNG)'
+                        ],
+                        'debug' => $debug
+                    ]
+                ], Response::HTTP_BAD_REQUEST);
+            }
+
+            // Try to decode JSON to validate format
+            try {
+                $data = json_decode($content, true, 512, JSON_THROW_ON_ERROR);
+                $debug['decoded_data'] = $data;
+                
+                // Validate required fields
+                $missingFields = [];
+                if (empty($data['title'])) {
+                    $missingFields['title'] = 'Document title is required';
+                }
+                if (empty($data['status'])) {
+                    $missingFields['status'] = 'Document status is required';
+                }
+                if (empty($data['signDeadline'])) {
+                    $missingFields['signDeadline'] = 'Signing deadline is required';
+                }
+                
+                if (!empty($missingFields)) {
+                    return $this->json([
+                        'status' => 'error',
+                        'message' => 'Missing required fields',
+                        'details' => [
+                            'missing_fields' => $missingFields,
+                            'received_data' => $data,
+                            'valid_statuses' => ['draft', 'sent', 'signed', 'cancelled'],
+                            'date_format' => 'ISO 8601 (e.g., 2025-05-11T11:32:33+00:00)',
+                            'debug' => $debug
+                        ]
+                    ], Response::HTTP_BAD_REQUEST);
+                }
+                
+                // Validate status
+                $validStatuses = ['draft', 'sent', 'signed', 'cancelled'];
+                if (!in_array($data['status'], $validStatuses)) {
+                    return $this->json([
+                        'status' => 'error',
+                        'message' => 'Invalid status value',
+                        'details' => [
+                            'current_value' => $data['status'],
+                            'allowed_values' => $validStatuses,
+                            'received_data' => $data,
+                            'debug' => $debug
+                        ]
+                    ], Response::HTTP_BAD_REQUEST);
+                }
+                
+                // Validate date format
+                try {
+                    new \DateTime($data['signDeadline']);
+                } catch (\Exception $e) {
+                    return $this->json([
+                        'status' => 'error',
+                        'message' => 'Invalid date format',
+                        'details' => [
+                            'field' => 'signDeadline',
+                            'current_value' => $data['signDeadline'],
+                            'expected_format' => 'ISO 8601 (e.g., 2025-05-11T11:32:33+00:00)',
+                            'received_data' => $data,
+                            'debug' => $debug
+                        ]
+                    ], Response::HTTP_BAD_REQUEST);
+                }
+                
+            } catch (\JsonException $e) {
+                return $this->json([
+                    'status' => 'error',
+                    'message' => 'Invalid JSON format',
+                    'details' => [
+                        'error' => $e->getMessage(),
+                        'example' => [
+                            'title' => 'Contract Agreement',
+                            'status' => 'draft',
+                            'signDeadline' => '2025-05-11T11:32:33+00:00',
+                            'isTemplate' => false
+                        ],
+                        'debug' => $debug
+                    ]
+                ], Response::HTTP_BAD_REQUEST);
+            }
+
+            // Create document entity but do not persist/flush yet
+            $document = new Document();
+            $document->setTitle($data['title']);
+            $document->setStatus($data['status']);
+            $document->setSignDeadline(new \DateTime($data['signDeadline']));
+            $document->setIsTemplate($data['isTemplate'] ?? false);
+            $document->setCreatedBy($this->getUser());
+            $document->setCreatedAt(new \DateTimeImmutable());
+            $document->setUpdatedAt(new \DateTimeImmutable());
+
+            // Handle file upload if present
+            if ($file) {
+                // Validate file type
+                $allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+                if (!in_array($file->getMimeType(), $allowedMimeTypes)) {
+                    return $this->json([
+                        'status' => 'error',
+                        'message' => 'Invalid file type',
+                        'details' => [
+                            'current_type' => $file->getMimeType(),
+                            'allowed_types' => $allowedMimeTypes,
+                            'allowed_extensions' => ['.pdf', '.jpg', '.jpeg', '.png'],
+                            'debug' => $debug
+                        ]
+                    ], Response::HTTP_BAD_REQUEST);
+                }
+
+                // Generate unique filename
+                $originalFilename = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+                $safeFilename = $this->slugger->slug($originalFilename);
+                $newFilename = $safeFilename.'-'.uniqid().'.'.$file->guessExtension();
+
+                try {
+                    // Ensure upload directory exists
+                    if (!is_dir($this->uploadDirectory)) {
+                        mkdir($this->uploadDirectory, 0777, true);
+                    }
+
+                    // Move file to upload directory
+                    $file->move($this->uploadDirectory, $newFilename);
+
+                    // Set file path on document
+                    $document->setFilePath($newFilename);
+                } catch (\Exception $e) {
+                    $this->logger->error('Error uploading file', [
+                        'error' => $e->getMessage(),
+                        'document_title' => $document->getTitle()
+                    ]);
+                    
+                    return $this->json([
+                        'status' => 'error',
+                        'message' => 'Failed to upload file',
+                        'details' => [
+                            'error' => $e->getMessage(),
+                            'file_name' => $file->getClientOriginalName(),
+                            'file_size' => $file->getSize(),
+                            'upload_directory' => $this->uploadDirectory,
+                            'debug' => $debug
+                        ]
+                    ], Response::HTTP_INTERNAL_SERVER_ERROR);
+                }
+            } else {
+                // If file is required, return error
+                return $this->json([
+                    'status' => 'error',
+                    'message' => 'File is required',
+                    'details' => [ 'debug' => $debug ]
+                ], Response::HTTP_BAD_REQUEST);
+            }
+
+            // Persist and flush only after all required fields are set
+            $this->entityManager->persist($document);
+            $this->entityManager->flush();
+
             $json = $this->serializer->serialize($document, 'json', ['groups' => 'document:read']);
             return new JsonResponse($json, Response::HTTP_CREATED, [], true);
         } catch (\InvalidArgumentException $e) {
-            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+            return $this->json([
+                'status' => 'error',
+                'message' => 'Invalid request data',
+                'details' => [
+                    'error' => $e->getMessage(),
+                    'debug' => [
+                        'form_fields' => $request->request->all(),
+                        'files' => $request->files->all(),
+                        'content_type' => $request->headers->get('Content-Type', ''),
+                        'raw_content' => $request->getContent()
+                    ]
+                ]
+            ], Response::HTTP_BAD_REQUEST);
+        } catch (\Exception $e) {
+            $this->logger->error('Error creating document', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return $this->json([
+                'status' => 'error',
+                'message' => 'Internal server error',
+                'details' => [
+                    'error' => 'An unexpected error occurred while creating the document',
+                    'debug' => [
+                        'form_fields' => $request->request->all(),
+                        'files' => $request->files->all(),
+                        'content_type' => $request->headers->get('Content-Type', ''),
+                        'raw_content' => $request->getContent()
+                    ]
+                ]
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 

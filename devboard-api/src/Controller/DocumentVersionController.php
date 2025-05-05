@@ -6,7 +6,7 @@ use App\Entity\Document;
 use App\Entity\DocumentVersion;
 use App\Repository\DocumentRepository;
 use App\Repository\DocumentVersionRepository;
-use App\Service\DocumentVersionService;
+use App\Service\Document\DocumentVersionService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
