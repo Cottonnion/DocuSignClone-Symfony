@@ -24,3 +24,8 @@
 # OS
 .DS_Store
 Thumbs.db
+
+###> phpunit/phpunit ###
+/phpunit.xml
+/.phpunit.cache/
+###< phpunit/phpunit ###
