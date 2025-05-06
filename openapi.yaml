@@ -1,0 +1,264 @@
+openapi: 3.0.0
+info:
+  title: DevBoard API
+  version: 1.0.0
+  description: API for document management and user authentication
+
+servers:
+  - url: /api
+    description: Main API server
+
+paths:
+  /user/validate_login:
+    post:
+      summary: Login user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  access_token:
+                    type: string
+                  refresh_token:
+                    type: string
+
+  /user/create:
+    post:
+      summary: Register new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+                name:
+                  type: string
+      responses:
+        '201':
+          description: User created successfully
+
+  /user/self:
+    get:
+      summary: Get user profile
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User profile retrieved successfully
+
+  /user/request-password-reset:
+    post:
+      summary: Request password reset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+      responses:
+        '200':
+          description: Password reset email sent if account exists
+
+  /user/reset-password/{token}:
+    post:
+      summary: Reset password with token
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Password reset successful
+
+  /token/refresh:
+    post:
+      summary: Refresh access token
+      parameters:
+        - name: X-Refresh-Token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: New access token generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  access_token:
+                    type: string
+                  expires_in:
+                    type: integer
+
+  /v1/documents:
+    get:
+      summary: List documents
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of documents
+    post:
+      summary: Create new document
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                content:
+                  type: string
+      responses:
+        '201':
+          description: Document created successfully
+
+  /v1/documents/{id}:
+    get:
+      summary: Get document details
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Document details
+    put:
+      summary: Update document
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                content:
+                  type: string
+      responses:
+        '200':
+          description: Document updated successfully
+    delete:
+      summary: Delete document
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Document deleted successfully
+
+  /v1/documents/{id}/audit:
+    get:
+      summary: Get document audit logs
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Document audit logs
+
+  /v1/documents/{id}/remind:
+    post:
+      summary: Send reminders to signatories
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Reminders sent successfully
+
+  /v1/documents/upload:
+    post:
+      summary: Upload document file
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: File uploaded successfully
+
+securitySchemes:
+  BearerAuth:
+    type: http
+    scheme: bearer
+    bearerFormat: JWT 
