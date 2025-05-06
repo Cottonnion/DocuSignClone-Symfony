@@ -31,7 +31,6 @@ class LoginService
         private WpUserRepository $userRepository,
         private UserPasswordHasherInterface $passwordHasher,
         private JWTTokenManagerInterface $jwtManager,
-<<<<<<< HEAD
         private UserLoggerService $userLogger,
         private IpRateLimiterService $ipRateLimiter,
         private EntityManagerInterface $entityManager,
@@ -39,10 +38,6 @@ class LoginService
         private MFAService $mfaService,
         private ParameterBagInterface $params,
         private CacheInterface $cache
-=======
-        private ParameterBagInterface $params,
-        private TokenRefreshService $tokenService
->>>>>>> stable
     ) {
         // Set default values in case parameters are missing
         $this->maxAttempts = $this->params->get('app.login.max_attempts');
@@ -139,17 +134,8 @@ class LoginService
             $this->entityManager->persist($user);
             $this->entityManager->flush();
 
-<<<<<<< HEAD
             // Generate both access and refresh tokens
             $tokens = $this->tokenRefreshService->generateTokens($user);
-=======
-            // Persist changes immediately after updating lastLoginAt
-            $this->entityManagerInterface->persist($user);
-            $this->entityManagerInterface->flush();
-
-            // Generate both access and refresh tokens
-            $tokens = $this->tokenService->generateTokens($user);
->>>>>>> stable
 
             // Log successful login
             $this->userLogger->logLoginAttempt($user->getEmail(), true);
