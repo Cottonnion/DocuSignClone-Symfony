@@ -6,12 +6,15 @@ use App\Repository\RefreshTokenRepository;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: RefreshTokenRepository::class)]
+<<<<<<< HEAD
 #[ORM\UniqueConstraint(
     name: "unique_active_token_per_user",
     columns: ["user_id", "is_active"],
     options: ["where" => "(is_active = true)"]
 )]
 #[ORM\Index(columns: ["expires_at"])]
+=======
+>>>>>>> stable
 class RefreshToken
 {
     #[ORM\Id]
@@ -110,9 +113,12 @@ class RefreshToken
 
         return $this;
     }
+<<<<<<< HEAD
 
     public function isExpired(): bool
     {
         return $this->expires_at < new \DateTimeImmutable();
     }
+=======
+>>>>>>> stable
 }

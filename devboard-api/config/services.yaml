@@ -117,13 +117,17 @@ services:
         tags: 
             - { name: 'kernel.event_subscriber' }
 
+<<<<<<< HEAD
     # JWT Authentication Handlers
+=======
+>>>>>>> stable
     app.authentication_success_handler:
         class: App\Security\AuthenticationSuccessHandler
         parent: lexik_jwt_authentication.handler.authentication_success
         arguments:
             $jwtManager: '@lexik_jwt_authentication.jwt_manager'
             $dispatcher: '@event_dispatcher'
+<<<<<<< HEAD
             $tokenRefreshService: '@App\Service\Auth\TokenRefreshService'
 
     app.authentication_failure_handler:
@@ -159,3 +163,6 @@ services:
     App\Controller\DocumentController:
         arguments:
             $uploadDirectory: '%document_upload_directory%'
+=======
+            $tokenRefreshService: '@App\Service\Auth\TokenRefreshService'
+>>>>>>> stable

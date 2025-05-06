@@ -1,0 +1,9 @@
+parameters:
+    login:
+        max_attempts: 5
+        lockout_minutes: 15
+        error_messages:
+            invalid_credentials: 'Invalid email or password.'
+            account_locked: 'Account is locked. Please try again later.'
+            account_inactive: 'Account is inactive. Please contact support.'
+            generic_error: 'An error occurred during login.' 

@@ -5,7 +5,10 @@ namespace App\Repository;
 use App\Entity\RefreshToken;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
+<<<<<<< HEAD
 use DateTimeImmutable;
+=======
+>>>>>>> stable
 
 /**
  * @extends ServiceEntityRepository<RefreshToken>
@@ -41,6 +44,7 @@ class RefreshTokenRepository extends ServiceEntityRepository
     //            ->getOneOrNullResult()
     //        ;
     //    }
+<<<<<<< HEAD
 
     public function findExpiredTokens(DateTimeImmutable $now): array
     {
@@ -50,4 +54,6 @@ class RefreshTokenRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+=======
+>>>>>>> stable
 }

@@ -3,9 +3,13 @@
 namespace App\Controller;
 
 use App\DTO\LoginDTO;
+<<<<<<< HEAD
 use App\DTO\MFAVerificationDTO;
 use App\Service\Auth\LoginService;
 use App\Service\Auth\MFAService;
+=======
+use App\Service\Auth\loginService;
+>>>>>>> stable
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Request;

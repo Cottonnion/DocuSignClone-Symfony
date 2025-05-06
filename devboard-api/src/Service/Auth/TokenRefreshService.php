@@ -9,17 +9,24 @@ use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 
+<<<<<<< HEAD
 /**
  * Manages JWT token refresh operations
  */
 class TokenRefreshService
 {
+=======
+class TokenRefreshService
+{
+    
+>>>>>>> stable
     public function __construct(
         private RefreshTokenRepository $refreshTokenRepository,
         private EntityManagerInterface $entityManager,
         private JWTTokenManagerInterface $jWTTokenManager
     ){}
 
+<<<<<<< HEAD
     /**
      * @param WpUser $user User to generate tokens for
      * @return array{success: bool, access_token: string, refresh_token: string, expires_in: int}
@@ -31,6 +38,11 @@ class TokenRefreshService
         
         // Deactivate and remove old tokens
         $this->removeExistingTokens($user);
+=======
+    public function generateTokens( WpUser $user): array
+    {
+        $this->deactivateExistingTokens($user);
+>>>>>>> stable
 
         $accessToken = $this->jWTTokenManager->create($user);
 
@@ -41,7 +53,12 @@ class TokenRefreshService
         $refreshTokenEntity->setRefreshToken(hash('sha256', $refreshToken));
         $refreshTokenEntity->setExpiresAt(new DateTimeImmutable('+14 days'));
         $refreshTokenEntity->setIsActive(true);
+<<<<<<< HEAD
         $refreshTokenEntity->setCreatedAt(new DateTimeImmutable());
+=======
+        $refreshTokenEntity->setCreatedAt(new DateTimeImmutable()); // Add this line
+
+>>>>>>> stable
 
         $this->entityManager->persist($refreshTokenEntity);
         $this->entityManager->flush();
@@ -54,10 +71,13 @@ class TokenRefreshService
         ];
     }
 
+<<<<<<< HEAD
     /**
      * @param string $refreshToken Token to validate
      * @return array{access_token: string, expires_in: int}|null
      */
+=======
+>>>>>>> stable
     public function refreshAccessToken(string $refreshToken):? array
     {
         $hashedToken = hash('sha256', $refreshToken);
@@ -66,12 +86,16 @@ class TokenRefreshService
             'is_active'     =>  true
         ]);
 
+<<<<<<< HEAD
         if(!$tokenEntity || $tokenEntity->isExpired()){
             // If token is expired or invalid, remove it
             if ($tokenEntity) {
                 $this->entityManager->remove($tokenEntity);
                 $this->entityManager->flush();
             }
+=======
+        if(!$tokenEntity || $tokenEntity->isExpired){
+>>>>>>> stable
             return null;
         }
 
@@ -84,6 +108,7 @@ class TokenRefreshService
         ];
     }
 
+<<<<<<< HEAD
     /**
      * @param WpUser $user User whose tokens to remove
      */
@@ -95,10 +120,21 @@ class TokenRefreshService
 
         foreach ($existingTokens as $token) {
             $this->entityManager->remove($token);
+=======
+    public function deactivateExistingTokens(WpUser $user){
+        $activeTokens   =   $this->refreshTokenRepository->findBy([
+            'user'      =>  $user,
+            'is_active' =>  true
+        ]);
+
+        foreach ($activeTokens as $tok){
+            $tok->setIsActive(false);
+>>>>>>> stable
         }
 
         $this->entityManager->flush();
     }
+<<<<<<< HEAD
 
     /**
      * Removes expired tokens from database
@@ -151,5 +187,7 @@ class TokenRefreshService
 
         return null;
     }
+=======
+>>>>>>> stable
 }
 
