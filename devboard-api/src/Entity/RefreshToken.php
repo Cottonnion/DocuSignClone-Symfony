@@ -116,3 +116,4 @@ class RefreshToken
         return $this->expires_at < new \DateTimeImmutable();
     }
 }
+
