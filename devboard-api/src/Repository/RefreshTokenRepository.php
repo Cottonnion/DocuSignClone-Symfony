@@ -16,7 +16,6 @@ class RefreshTokenRepository extends ServiceEntityRepository
     {
         parent::__construct($registry, RefreshToken::class);
     }
-    //    }
 
     public function findExpiredTokens(DateTimeImmutable $now): array
     {
@@ -26,4 +25,5 @@ class RefreshTokenRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
 }
